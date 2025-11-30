@@ -1,0 +1,5 @@
+{
+  "name": "Sistem Penilaian Esai AI PIPB",
+  "description": "An advanced grading application for Politeknik Industri Petrokimia Banten, powered by Gemini. It uses OCR to read handwritten answers and grades them against a provided key.",
+  "requestFramePermissions": []
+}

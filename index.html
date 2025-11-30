@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistem Penilaian Esai AI PIPB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              // Custom adjustments if needed
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* For custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #e0f2fe; /* bg-sky-100 */
+      }
+      .dark ::-webkit-scrollbar-track {
+        background: #1f2937; /* dark:bg-gray-800 */
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: #7dd3fc; /* bg-sky-300 */
+        border-radius: 4px;
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #4b5563; /* dark:bg-gray-600 */
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: #38bdf8; /* bg-sky-400 */
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: #6b7280; /* dark:bg-gray-500 */
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "mammoth": "https://cdn.jsdelivr.net/npm/mammoth@1.7.2/+esm",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs",
+    "jszip": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"
+  }
+}
+</script>
+</head>
+  <body class="bg-sky-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-200">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
