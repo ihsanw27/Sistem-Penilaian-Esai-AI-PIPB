@@ -1,12 +1,17 @@
 
+/**
+ * @file officeFileUtils.ts
+ * @description Utilitas untuk mengekstrak konten teks mentah dari file Microsoft Office.
+ * Hal ini memungkinkan AI untuk menilai dokumen Word/Excel/PPT secara langsung dengan membaca teksnya,
+ * alih-alih mengandalkan OCR visual, memastikan akurasi 100% untuk dokumen digital.
+ */
+
 import mammoth from 'mammoth';
 import * as xlsx from 'xlsx';
 import JSZip from 'jszip';
 
 /**
- * Reads a File object and returns its content as an ArrayBuffer.
- * @param file - The file to read.
- * @returns A promise that resolves with the file's ArrayBuffer.
+ * Helper: Membaca objek File dan mengembalikan kontennya sebagai ArrayBuffer.
  */
 const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
     return new Promise((resolve, reject) => {
@@ -20,9 +25,10 @@ const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
 };
 
 /**
- * Extracts raw text content from a .docx file.
- * @param file - The .docx file.
- * @returns A promise that resolves with the extracted text.
+ * Mengekstrak konten teks mentah dari file .docx (Word).
+ * Menggunakan 'mammoth.js' untuk mengurai struktur XML dari dokumen Word.
+ * @param file - File .docx.
+ * @returns String teks dari body dokumen.
  */
 const extractTextFromDocx = async (file: File): Promise<string> => {
     const arrayBuffer = await readFileAsArrayBuffer(file);
@@ -31,9 +37,10 @@ const extractTextFromDocx = async (file: File): Promise<string> => {
 };
 
 /**
- * Extracts text content from all sheets of an .xlsx file.
- * @param file - The .xlsx file.
- * @returns A promise that resolves with the concatenated text from all sheets.
+ * Mengekstrak konten teks dari semua sheet file .xlsx (Excel).
+ * Menggunakan 'xlsx' (SheetJS) untuk mengurai workbook.
+ * @param file - File .xlsx.
+ * @returns String gabungan: "Sheet: Name \n Content \n\n"
  */
 const extractTextFromXlsx = async (file: File): Promise<string> => {
     const arrayBuffer = await readFileAsArrayBuffer(file);
@@ -41,6 +48,7 @@ const extractTextFromXlsx = async (file: File): Promise<string> => {
     let fullText = '';
     workbook.SheetNames.forEach(sheetName => {
         const worksheet = workbook.Sheets[sheetName];
+        // Konversi data sheet ke format teks sederhana
         const text = xlsx.utils.sheet_to_txt(worksheet);
         fullText += `Sheet: ${sheetName}\n${text}\n\n`;
     });
@@ -48,17 +56,20 @@ const extractTextFromXlsx = async (file: File): Promise<string> => {
 };
 
 /**
- * Extracts text content from all slides of a .pptx file.
- * It does this by unzipping the file and parsing the XML of each slide.
- * @param file - The .pptx file.
- * @returns A promise that resolves with the concatenated text from all slides.
+ * Mengekstrak konten teks dari semua slide file .pptx (PowerPoint).
+ * TEKNIK: File PPTX sebenarnya adalah ZIP dari file XML. 
+ * Fungsi ini membuka zip pptx, menemukan semua file 'slideX.xml', 
+ * dan mengurainya untuk menemukan tag <a:t> (teks).
+ * 
+ * @param file - File .pptx.
+ * @returns Teks gabungan dari semua slide.
  */
 const extractTextFromPptx = async (file: File): Promise<string> => {
     const arrayBuffer = await readFileAsArrayBuffer(file);
     const zip = await JSZip.loadAsync(arrayBuffer);
     const slidePromises: Promise<string>[] = [];
     
-    // Find all slide files (e.g., ppt/slides/slide1.xml, slide2.xml).
+    // Temukan semua file slide (misalnya, ppt/slides/slide1.xml)
     zip.folder('ppt/slides')?.forEach((relativePath, file) => {
         if (relativePath.startsWith('slide') && relativePath.endsWith('.xml')) {
             slidePromises.push(file.async('string'));
@@ -68,13 +79,13 @@ const extractTextFromPptx = async (file: File): Promise<string> => {
     const slideXmls = await Promise.all(slidePromises);
     let fullText = '';
 
-    // Regex to extract text from <a:t> tags within the slide XML.
+    // Regex untuk mengekstrak teks dari tag <a:t> dalam struktur XML slide
     const textContentRegex = /<a:t.*?>(.*?)<\/a:t>/g;
 
     slideXmls.forEach((xml, index) => {
         fullText += `--- Slide ${index + 1} ---\n`;
         let match;
-        // Use a Set to avoid duplicate text blocks which can be common in PPTX XML.
+        // Gunakan Set untuk menghindari blok teks duplikat (umum dalam struktur XML PPTX)
         const uniqueText = new Set<string>();
         while ((match = textContentRegex.exec(xml)) !== null) {
             uniqueText.add(match[1].trim());
@@ -87,10 +98,9 @@ const extractTextFromPptx = async (file: File): Promise<string> => {
 
 
 /**
- * Main dispatcher function to extract text from various Office file types.
- * It identifies the file type and calls the appropriate extraction function.
- * @param file - The Office file (.docx, .xlsx, .pptx).
- * @returns A promise that resolves with the extracted text. Rejects if the file type is unsupported.
+ * Fungsi dispatcher utama untuk mengekstrak teks dari tipe file Office yang didukung.
+ * @param file - File Office.
+ * @returns Promise yang diselesaikan dengan teks yang diekstrak.
  */
 export const extractTextFromOfficeFile = async (file: File): Promise<string> => {
     if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {

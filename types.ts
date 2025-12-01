@@ -1,41 +1,93 @@
 
 /**
- * Represents the detailed feedback for a single question.
+ * @file types.ts
+ * @description Mendefinisikan antarmuka (interface) dan tipe data TypeScript inti yang digunakan di seluruh aplikasi.
+ * File ini berfungsi sebagai "Kontrak Data" antara komponen UI dan Layanan AI (Gemini).
+ * 
+ * @author System
+ * @version 1.2.0
+ */
+
+/**
+ * Merepresentasikan detail umpan balik untuk satu pertanyaan spesifik dalam jawaban siswa.
+ * Struktur ini dihasilkan oleh AI untuk setiap item soal yang teridentifikasi.
  */
 export interface FeedbackDetail {
-    /** The identifier for the question (e.g., "1", "2a", "Essay"). */
+    /** 
+     * Identifier untuk pertanyaan (misalnya, "1", "2a", "Essay"). 
+     * AI menyimpulkan ini dari struktur dokumen atau input dosen.
+     */
     questionNumber: string;
-    /** The specific text of the question being graded, extracted from the lecturer's key. */
+
+    /** 
+     * Teks spesifik dari pertanyaan yang dinilai.
+     * Diekstrak langsung dari file/teks kunci jawaban dosen untuk memberikan konteks pada laporan.
+     */
     questionText?: string;
-    /** The specific correct answer or grading criteria from the lecturer's key. */
+
+    /** 
+     * Jawaban yang benar, standar, atau kriteria penilaian spesifik.
+     * Diekstrak dari kunci dosen. Digunakan sebagai 'Ground Truth' untuk penilaian.
+     */
     lecturerAnswer?: string;
-    /** The specific text extracted from the student's answer for this question (OCR). */
+
+    /** 
+     * Teks spesifik yang diekstrak dari jawaban siswa untuk pertanyaan ini.
+     * PENTING: Ini adalah salinan VERBATIM (OCR) dari apa yang ditulis siswa, bukan ringkasan.
+     * Digunakan untuk "Triangulasi" (Soal vs Standar vs Jawaban Siswa).
+     */
     studentAnswer?: string;
-    /** The score awarded for the question, on a scale of 0-100. */
+
+    /** 
+     * Skor yang diberikan untuk pertanyaan spesifik ini.
+     * Rentang: 0-100.
+     */
     score: number;
-    /** Constructive feedback text for the student's answer to this question. */
+
+    /** 
+     * Umpan balik konstruktif dan alasan penilaian yang diberikan oleh AI.
+     * Menjelaskan mengapa poin dikurangi atau diberikan berdasarkan lecturerAnswer.
+     */
     feedback: string;
 }
 
 /**
- * Represents the complete result of a grading operation for a single submission.
+ * Merepresentasikan hasil lengkap dari operasi penilaian untuk satu pengumpulan (satu siswa).
+ * Objek ini adalah payload utama yang dikembalikan oleh layanan `gradeAnswer`.
  */
 export interface GradeResult {
-    /** The name of the file being graded, used in class mode. */
+    /** 
+     * Nama file yang dinilai.
+     * Identifier utama dalam Mode Kelas (Batch). Opsional dalam Mode Individu.
+     */
     fileName?: string;
-    /** The overall final grade, on a scale of 0-100. */
+
+    /** 
+     * Nilai akhir keseluruhan yang dihitung oleh AI.
+     * Rentang: 0-100.
+     */
     grade: number;
-    /** An array of detailed feedback for each question. */
+
+    /** 
+     * Array objek umpan balik terperinci, satu untuk setiap pertanyaan yang ditemukan.
+     */
     detailedFeedback: FeedbackDetail[];
-    /** General, actionable suggestions for improvement. */
+
+    /** 
+     * Saran tingkat tinggi yang dapat ditindaklanjuti bagi siswa untuk meningkatkan kinerja mereka.
+     */
     improvements: string;
-    /** The text extracted or read from the student's submission by the AI (OCR). */
+
+    /** 
+     * Transkripsi teks lengkap (raw full-text) dari jawaban siswa.
+     * Diekstrak oleh AI (OCR). Digunakan untuk verifikasi manual (sanity check) oleh dosen.
+     */
     studentText?: string;
 }
 
-
 /**
- * Enum for the different features available in the application via the NavBar.
+ * Enum untuk berbagai fitur yang tersedia dalam aplikasi melalui NavBar.
+ * Saat ini, hanya GradingSystem yang sepenuhnya aktif di dasbor utama.
  */
 export enum AppFeature {
     GradingSystem = 'AI Grading System',
@@ -46,11 +98,11 @@ export enum AppFeature {
 }
 
 /**
- * Represents a single message in a chat conversation.
+ * Merepresentasikan satu pesan dalam percakapan obrolan (untuk fitur ChatBot).
  */
 export interface ChatMessage {
-    /** The role of the sender, either the 'user' or the 'model'. */
+    /** Peran pengirim: 'user' (manusia) atau 'model' (AI). */
     role: 'user' | 'model';
-    /** The text content of the message. */
+    /** Konten teks aktual dari pesan. */
     text: string;
 }

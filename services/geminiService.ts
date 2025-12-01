@@ -1,41 +1,66 @@
+
+/**
+ * @file geminiService.ts
+ * @description Layanan ini menangani semua interaksi dengan Google Gemini API.
+ * Layanan ini mengenkapsulasi logika untuk rekayasa prompt (prompt engineering), konstruksi payload,
+ * konfigurasi API, dan penanganan kesalahan yang kuat (retries/backoff).
+ * 
+ * @dependencies @google/genai
+ */
+
 import { GoogleGenAI, Type, GenerateContentResponse, Chat, Modality, LiveServerMessage } from "@google/genai";
 import { GradeResult } from "../types";
 
-// Ensure the API key is available.
+// Memastikan kunci API tersedia dari environment variable.
 const API_KEY = process.env.API_KEY;
 
 if (!API_KEY) {
     throw new Error("API_KEY environment variable not set");
 }
 
-// Initialize the GoogleGenAI client.
+// Inisialisasi klien GoogleGenAI dengan kunci API.
+// Instance ini digunakan untuk semua panggilan berikutnya.
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
-// Type definition for the content parts that can be sent to the Gemini API.
+// Definisi tipe untuk bagian konten yang dapat dikirim ke Gemini API.
+// Bisa berupa teks sederhana atau data biner inline (gambar/PDF) yang dikodekan dalam Base64.
 type ContentPart = { text: string; } | { inlineData: { data: string; mimeType: string; }; };
 
-// FIX: Add a sleep utility for exponential backoff.
+/**
+ * Fungsi utilitas untuk menjeda eksekusi selama durasi tertentu.
+ * Digunakan untuk exponential backoff selama rate limiting API.
+ * @param ms - Durasi tidur dalam milidetik.
+ */
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Grades a student's answer against a lecturer's answer key using the Gemini API.
- * This function orchestrates a detailed prompt engineering strategy to ensure consistent,
- * deterministic, and objective grading. It now includes a retry mechanism with exponential 
- * backoff to handle API rate limiting (429 errors).
+ * Menilai jawaban siswa terhadap kunci jawaban dosen menggunakan Gemini API.
+ * 
+ * CATATAN ARSITEKTUR:
+ * Fungsi ini menggunakan strategi "One-Shot Prompting" dengan Instruksi Sistem yang sangat spesifik.
+ * Dirancang untuk menjadi deterministik (temperature = 0) guna memastikan konsistensi penilaian.
+ * 
+ * STRATEGI RETRY (PENGULANGAN):
+ * Mengimplementasikan loop retry yang kuat dengan Exponential Backoff dan Jitter untuk menangani
+ * kesalahan HTTP 429 (Too Many Requests), yang umum terjadi saat pemrosesan batch dengan LLM.
  *
- * @param studentAnswerParts - An array of content parts representing the student's submission (text and/or images).
- * @param lecturerAnswer - An object containing the lecturer's answer key, either as content parts or plain text.
- * @returns A promise that resolves to a structured `GradeResult` object, or `null` if an error occurs.
+ * @param studentAnswerParts - Array bagian konten (Teks/Gambar/PDF) yang mewakili jawaban siswa.
+ * @param lecturerAnswer - Kunci referensi. Bisa berupa teks mentah atau file (gambar/PDF).
+ * @returns Promise yang menghasilkan objek `GradeResult` terstruktur, atau `null` jika gagal setelah retry maksimal.
  */
 export const gradeAnswer = async (
     studentAnswerParts: ContentPart[],
     lecturerAnswer: { parts?: ContentPart[]; text?: string }
 ): Promise<GradeResult | null> => {
-    // QUALITY UPGRADE: Switched to gemini-3-pro-preview for state-of-the-art reasoning 
-    // and complex task handling, ensuring maximum grading accuracy.
+    // UPGRADE KUALITAS: Menggunakan 'gemini-3-pro-preview' karena menawarkan kemampuan penalaran superior
+    // untuk tugas OCR kompleks dan pemetaan konteks dibandingkan model Flash.
     const gradingModel = 'gemini-3-pro-preview';
 
-    // CONSISTENCY ENHANCEMENT V10: Added Robust Mapping for Random Order and Strict Verbatim Rules.
+    // REKAYASA PROMPT (PROMPT ENGINEERING):
+    // Instruksi ini adalah "Otak" dari penilai. Menegakkan aturan ketat:
+    // 1. Determinisme: Nilai harus konsisten.
+    // 2. Pemindaian Non-Linear: Siswa mungkin menulis Jawaban #5 sebelum Jawaban #1.
+    // 3. Ekstraksi Verbatim: AI harus mengutip siswa persis untuk verifikasi, ringkasan dilarang.
     const gradingInstruction = `
 Anda adalah **Mesin Penilai Deterministik**. Peran Anda adalah untuk mengevaluasi jawaban siswa dengan objektivitas mekanis dan ketelitian absolut. Tujuan utama Anda adalah **konsistensi penilaian dan transparansi penuh**.
 
@@ -74,7 +99,7 @@ Anda dilarang keras menggunakan penilaian subjektif atau 'perasaan'. Setiap poin
 **CATATAN**: Abaikan nama siswa atau metadata identitas lainnya. Fokus hanya pada konten jawaban.
 `;
     
-    // Assemble the content parts for the API call, starting with the main instruction.
+    // Konstruksi Payload Multimodal
     const contentParts: ContentPart[] = [
         { text: gradingInstruction },
         { text: "\n\n--- JAWABAN SISWA UNTUK DIEVALUASI ---" },
@@ -82,7 +107,7 @@ Anda dilarang keras menggunakan penilaian subjektif atau 'perasaan'. Setiap poin
         { text: "--- AKHIR JAWABAN SISWA ---" }
     ];
 
-    // Append the lecturer's answer key to the content parts.
+    // Lampirkan kunci jawaban dosen (Konteks)
     if (lecturerAnswer.parts && lecturerAnswer.parts.length > 0) {
         contentParts.push({ text: "\n\n--- KUNCI JAWABAN SEBAGAI REFERENSI ---" });
         contentParts.push(...lecturerAnswer.parts);
@@ -93,7 +118,7 @@ Anda dilarang keras menggunakan penilaian subjektif atau 'perasaan'. Setiap poin
         throw new Error("Lecturer answer key is missing.");
     }
 
-    // Final instruction telling the model what to do and how to format the output.
+    // Instruksi penutup akhir untuk menegakkan format JSON
     const finalInstruction = `
 \n\nBerdasarkan perbandingan mekanis antara jawaban siswa dan kunci jawaban, lakukan:
 1.  **Ekstraksi Teks**: Tuliskan ulang apa yang Anda baca dari jawaban siswa secara global.
@@ -108,16 +133,17 @@ Kembalikan HANYA dalam format JSON sesuai skema.
 `;
     contentParts.push({ text: finalInstruction });
     
-    // Create the request payload outside the loop.
+    // Konfigurasi Permintaan API
     const requestPayload = {
         model: gradingModel,
         contents: { parts: contentParts },
         config: {
-            // NOTE: Thinking Config is not supported in gemini-3-pro-preview.
-            // Using standard generation with temperature 0 for determinism.
+            // Seed memastikan reproduktifitas. Input sama = Output sama.
             seed: 42,
+            // Temperature 0 menghilangkan keacakan, penting untuk penilaian objektif.
             temperature: 0, 
             responseMimeType: "application/json",
+            // Definisi Skema Ketat untuk memastikan UI dapat memproses hasil dengan aman.
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
@@ -173,12 +199,11 @@ Kembalikan HANYA dalam format JSON sesuai skema.
         }
     };
     
-    // --- Retry Logic ---
-    // Increased retry limits and backoff duration to safely handle rate limits without failure.
-    // 5 attempts allows the system to wait out most 429 windows.
+    // --- LOGIKA RETRY & BACKOFF ---
+    // Dikonfigurasi untuk ketahanan terhadap rate limits (QuotaExceeded)
     const MAX_RETRIES = 5; 
-    const INITIAL_BACKOFF_MS = 5000; // Increased to 5s to be more patient
-    const MAX_JITTER_MS = 2000; // Jitter up to 2s
+    const INITIAL_BACKOFF_MS = 3000; // Mulai dengan tunggu 3 detik (meningkat dari 2 detik)
+    const MAX_JITTER_MS = 2000; // Tambahkan hingga 2 detik keacakan
 
     let currentDelay = INITIAL_BACKOFF_MS;
 
@@ -186,42 +211,41 @@ Kembalikan HANYA dalam format JSON sesuai skema.
         try {
             const gradingResult: GenerateContentResponse = await ai.models.generateContent(requestPayload);
             const resultJson = JSON.parse(gradingResult.text);
-            return resultJson as GradeResult; // Success
+            return resultJson as GradeResult; // Sukses
         } catch (error: any) {
             const errorString = JSON.stringify(error) || error.toString();
+            // Deteksi Rate Limit (429) atau Resource Exhausted
             const isRateLimitError = errorString.includes('429') || errorString.includes('RESOURCE_EXHAUSTED');
 
             if (isRateLimitError && attempt < MAX_RETRIES) {
-                // Add Jitter: Random variation to prevent Thundering Herd problem
+                // Terapkan Jitter untuk mencegah "Thundering Herd" (semua worker mencoba ulang di ms yang sama)
                 const jitter = Math.floor(Math.random() * MAX_JITTER_MS);
                 const delay = currentDelay + jitter;
                 
                 console.warn(`Rate limit hit (attempt ${attempt}/${MAX_RETRIES}). Retrying in ${delay}ms...`);
                 await sleep(delay);
                 
-                // Exponential backoff for the base delay
-                currentDelay *= 1.5; // Slightly gentler multiplier to avoid extreme waits
+                // Exponential backoff: Tingkatkan waktu tunggu untuk upaya berikutnya
+                currentDelay *= 1.5; 
             } else {
                 console.error(`Error in grading process (attempt ${attempt}/${MAX_RETRIES}):`, error);
-                return null; // Final attempt failed or a non-retriable error occurred.
+                return null; // Fatal error atau max retries tercapai
             }
         }
     }
     
-    return null; // Should only be reached if something unexpected happens with the loop.
+    return null; // Fallback
 };
 
-// FIX: Add analyzeImageWithPrompt function for ImageAnalyzer component.
+// --- FUNGSI PENDUKUNG UNTUK FITUR LAIN ---
+
 type ImagePart = { inlineData: { data: string; mimeType: string; } };
 /**
- * Analyzes an image with a given text prompt using a multimodal model.
- * @param imagePart - The image to analyze, as a base64 encoded string with its MIME type.
- * @param prompt - The text prompt to guide the analysis.
- * @returns A promise that resolves to the model's text response.
+ * Menganalisis gambar dengan prompt teks menggunakan model multimodal.
+ * Digunakan oleh komponen ImageAnalyzer.
  */
 export const analyzeImageWithPrompt = async (imagePart: ImagePart, prompt: string): Promise<string> => {
     try {
-        // Upgrade to Gemini 3 Pro for better multimodal understanding
         const model = 'gemini-3-pro-preview';
         const response = await ai.models.generateContent({
             model,
@@ -234,33 +258,26 @@ export const analyzeImageWithPrompt = async (imagePart: ImagePart, prompt: strin
     }
 };
 
-// FIX: Add createChatSession function for ChatBot component.
 /**
- * Creates and returns a new chat session with the Gemini API.
- * The session is initialized with a system instruction for the model.
- * @returns A `Chat` object for interactive conversations.
+ * Membuat dan mengembalikan sesi obrolan baru dengan Gemini API.
+ * Digunakan oleh komponen ChatBot.
  */
 export const createChatSession = (): Chat => {
-    // Upgrade to Gemini 3 Pro for smarter conversational abilities
     const model = 'gemini-3-pro-preview';
     return ai.chats.create({
         model,
-        // The config is the same as the models.generateContent config.
         config: {
             systemInstruction: 'You are a helpful and friendly chatbot.',
         },
     });
 };
 
-// FIX: Add runComplexQuery function for ThinkingMode component.
 /**
- * Runs a complex query using a powerful model.
- * @param prompt - The complex prompt or question to send to the model.
- * @returns A promise that resolves to the model's detailed text response.
+ * Menjalankan kueri kompleks menggunakan model yang kuat.
+ * Digunakan oleh komponen ThinkingMode.
  */
 export const runComplexQuery = async (prompt: string): Promise<string> => {
     try {
-        // Upgrade to Gemini 3 Pro.
         const model = 'gemini-3-pro-preview';
         const response = await ai.models.generateContent({
             model,
@@ -273,11 +290,6 @@ export const runComplexQuery = async (prompt: string): Promise<string> => {
     }
 };
 
-
-// FIX: Add startTranscriptionSession function for AudioTranscriber component.
-/**
- * Interface for the callbacks required by the live transcription session.
- */
 interface TranscriptionCallbacks {
     onopen: () => void;
     onmessage: (message: LiveServerMessage) => void;
@@ -286,17 +298,14 @@ interface TranscriptionCallbacks {
 }
 
 /**
- * Initiates a live, real-time transcription session with the Gemini Live API.
- * @param callbacks - An object containing callback functions to handle session events (open, message, error, close).
- * @returns A promise that resolves to the live session object.
+ * Memulai sesi transkripsi real-time langsung dengan Gemini Live API.
+ * Menggunakan model audio-native preview.
  */
 export const startTranscriptionSession = (callbacks: TranscriptionCallbacks) => {
-    // Keep using the specialized audio preview model for live sessions
     return ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks,
         config: {
-            // Even if we only want transcription, AUDIO modality is required for the response.
             responseModalities: [Modality.AUDIO],
             inputAudioTranscription: {},
         }

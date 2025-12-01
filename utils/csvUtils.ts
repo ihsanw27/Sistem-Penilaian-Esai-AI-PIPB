@@ -1,15 +1,23 @@
 
+/**
+ * @file csvUtils.ts
+ * @description Utilitas untuk menghasilkan dan mengunduh laporan.
+ * Meskipun bernama 'csvUtils', file ini sekarang menghasilkan file Excel Multi-Sheet (.xlsx) tingkat lanjut.
+ */
+
 import { GradeResult } from '../types';
 import * as XLSX from 'xlsx';
 
 /**
- * Generates an Excel file with multiple sheets from an array of GradeResult objects.
- * Sheet 1: Summary (Name, Final Grade, Improvements)
- * Sheet 2: Detailed Analysis (Name, Q#, Question Text, Student Answer, Score, Feedback)
- * @param results - An array of grading results.
+ * Menghasilkan workbook Excel dengan dua sheet spesifik:
+ * 1. "Rekap Nilai" (Ringkasan): Satu baris per siswa, berisi nilai akhir dan saran utama.
+ * 2. "Analisis Per Soal" (Detail): Satu baris per PERTANYAAN per siswa. Berisi analisis granular.
+ * 
+ * @param results - Array hasil penilaian dari Mode Kelas.
+ * @returns Objek Workbook XLSX.
  */
 export function generateCsv(results: GradeResult[]): any {
-    // --- Sheet 1: Summary ---
+    // --- Sheet 1: Ringkasan ---
     const summaryData = results.map(res => ({
         'Nama File': res.fileName || 'N/A',
         'Nilai Akhir': res.grade,
@@ -17,10 +25,11 @@ export function generateCsv(results: GradeResult[]): any {
     }));
     const summarySheet = XLSX.utils.json_to_sheet(summaryData);
 
-    // --- Sheet 2: Detailed Analysis ---
+    // --- Sheet 2: Analisis Detail ---
     const detailedData: any[] = [];
     results.forEach(res => {
         res.detailedFeedback.forEach(fb => {
+            // Ratakan struktur bersarang untuk representasi tabular
             detailedData.push({
                 'Nama File': res.fileName || 'N/A',
                 'Nomor Soal': fb.questionNumber,
@@ -34,7 +43,7 @@ export function generateCsv(results: GradeResult[]): any {
     });
     const detailedSheet = XLSX.utils.json_to_sheet(detailedData);
 
-    // Create Workbook
+    // Buat Workbook dan lampirkan sheet
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, summarySheet, "Rekap Nilai");
     XLSX.utils.book_append_sheet(workbook, detailedSheet, "Analisis Per Soal");
@@ -43,12 +52,12 @@ export function generateCsv(results: GradeResult[]): any {
 }
 
 /**
- * Triggers a browser download for the generated Excel workbook.
- * @param workbook - The XLSX workbook object.
- * @param fileName - The desired name for the downloaded file.
+ * Memicu unduhan browser untuk workbook Excel yang dihasilkan.
+ * @param workbook - Objek workbook XLSX.
+ * @param fileName - Nama file yang diinginkan untuk file yang diunduh.
  */
 export function downloadCsv(workbook: any, fileName: string) {
-    // Use .xlsx extension
+    // Pastikan ekstensi .xlsx
     const fullFileName = fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`;
     XLSX.writeFile(workbook, fullFileName);
 }
