@@ -1,4 +1,3 @@
-
 /**
  * @file ClassMode.tsx
  * @description Komponen Penilaian Batch (Mode Kelas).
@@ -479,7 +478,9 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                 {/* --- PANEL INPUT (KIRI) --- */}
                 <div className="space-y-4 p-5 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-gray-700 shadow-sm transition-colors duration-200">
-                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 border-b dark:border-gray-700 pb-2 mb-4">Langkah 1: Unggah Berkas Massal</h2>
+                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 border-b dark:border-gray-700 pb-2 mb-4 flex items-center gap-2">
+                         <span className="text-xl">📦</span> Langkah 1: Unggah Berkas Massal
+                    </h2>
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Unggah Semua Jawaban Mahasiswa</label>
                         <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-blue-200 dark:border-blue-800 border-dashed rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors">
@@ -519,7 +520,9 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                         </div>
                     </div>
                     
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 border-b dark:border-gray-700 pb-2 mb-4 mt-8">Langkah 2: Unggah Soal & Kunci Jawaban</h2>
+                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 border-b dark:border-gray-700 pb-2 mb-4 mt-8 flex items-center gap-2">
+                        <span className="text-xl">🔑</span> Langkah 2: Unggah Soal & Kunci Jawaban
+                    </h2>
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Unggah Kunci Jawaban Dosen</label>
                          <div className="rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
@@ -630,7 +633,9 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                         {/* Header Hasil */}
                         {(results.length > 0 || isLoading) && (
                             <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 py-3 -mx-4 px-4 border-b border-gray-100 dark:border-gray-700 z-10 flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Rekapitulasi Nilai Kelas</h2>
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                                    <span className="text-2xl">📊</span> Rekapitulasi Nilai Kelas
+                                </h2>
                                 <div className="flex gap-2">
                                     {results.length > 0 && !isLoading && (
                                         <>

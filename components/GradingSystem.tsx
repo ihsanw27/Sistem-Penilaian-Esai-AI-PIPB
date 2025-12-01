@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { fileToBase64, processUploadedFiles } from '../utils/fileUtils';
 import { gradeAnswer } from '../services/geminiService';
@@ -266,7 +265,9 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                 {/* --- PANEL INPUT (KIRI) --- */}
                 <div className="space-y-4 p-5 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-gray-700 shadow-sm transition-colors duration-200">
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 border-b dark:border-gray-700 pb-2 mb-4">Langkah 1: Unggah Jawaban Mahasiswa</h2>
+                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 border-b dark:border-gray-700 pb-2 mb-4 flex items-center gap-2">
+                        <span className="text-xl">📤</span> Langkah 1: Unggah Jawaban Mahasiswa
+                    </h2>
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Unggah File Jawaban</label>
                         <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-blue-200 dark:border-blue-800 border-dashed rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors">
@@ -312,7 +313,9 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                         </div>
                     </div>
                     
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 border-b dark:border-gray-700 pb-2 mb-4 mt-8">Langkah 2: Unggah Soal & Kunci Jawaban</h2>
+                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 border-b dark:border-gray-700 pb-2 mb-4 mt-8 flex items-center gap-2">
+                        <span className="text-xl">🔑</span> Langkah 2: Unggah Soal & Kunci Jawaban
+                    </h2>
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Unggah Kunci Jawaban Dosen</label>
                          <div className="rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
@@ -483,7 +486,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
 
                                     {/* Student OCR Text Display */}
                                     {result.studentText && (
-                                        <div className="bg-white dark:bg-gray-800 border border-blue-200 dark:border-gray-600 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="bg-white dark:bg-gray-800 border border-blue-200 dark:border-gray-600 rounded-xl overflow-hidden shadow-sm transition-colors border-l-4 border-l-blue-400 dark:border-l-blue-500">
                                             <button 
                                                 onClick={() => setShowOcr(!showOcr)}
                                                 className="w-full flex justify-between items-center p-4 bg-blue-50/50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors text-left"
@@ -521,7 +524,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                                         </h4>
                                         <div className="space-y-6">
                                             {result.detailedFeedback.map((fb, index) => (
-                                                <div key={index} className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-200 hover:border-blue-300 dark:hover:border-blue-500">
+                                                <div key={index} className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700 transition-colors duration-200 hover:border-blue-300 dark:hover:border-blue-500">
                                                     <div className="flex justify-between items-start mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">
                                                         <span className="font-black text-lg text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded">Soal #{fb.questionNumber}</span>
                                                         <div className="text-right">
