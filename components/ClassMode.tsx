@@ -927,7 +927,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                 </h4>
                                 <div className="space-y-6">
                                     {selectedResult.detailedFeedback.map((item, idx) => (
-                                        <div key={idx} className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm transition-all duration-200 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-500 hover:-translate-y-0.5">
+                                        <div key={idx} className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200 hover:border-blue-300 dark:hover:border-blue-500">
                                             <div className="flex justify-between items-start mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">
                                                 <span className="font-black text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded">Soal #{item.questionNumber}</span>
                                                 <span className={`text-xl font-bold ${getGradeColor(item.score)}`}>
