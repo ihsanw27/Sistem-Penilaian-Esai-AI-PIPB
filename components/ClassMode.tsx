@@ -14,7 +14,7 @@
  * - Visualisasi: Histogram Distribusi Nilai dan Statistik Kelas.
  * 
  * @author System
- * @version 1.5.0
+ * @version 1.6.0
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
@@ -56,6 +56,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     const [selectedResult, setSelectedResult] = useState<GradeResult | null>(null);
     const [showOcr, setShowOcr] = useState(false);
     const [showPreview, setShowPreview] = useState<boolean>(false); // State untuk Manifest Preview
+    const [expandedPreviews, setExpandedPreviews] = useState<Set<string>>(new Set()); // State untuk row yang di-expand di preview
     
     // Deteksi Duplikasi
     const [duplicateNames, setDuplicateNames] = useState<string[]>([]);
@@ -160,6 +161,13 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         return 'bg-red-400 dark:bg-red-500';
     };
 
+    // Helper: Membersihkan nama file untuk tampilan (menghapus cache-busting suffix)
+    const getDisplayFilename = (filename: string) => {
+        // Pola regex untuk menghapus _TIMESTAMP_RANDOM sebelum ekstensi
+        // Mencari: underscore + 13 digit + underscore + 6 alfanumerik + (opsional extension)
+        return filename.replace(/_\d{13}_[a-z0-9]{6}/, '');
+    };
+
     // --- HANDLER PENANGANAN FILE ---
     
     // Handler input Mahasiswa (Mode Kelas)
@@ -170,6 +178,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             setSubmissions([]);
             setResults([]);
             setDuplicateNames([]);
+            setExpandedPreviews(new Set());
             setShowDuplicateWarning(false);
             setShowPreview(true); // Otomatis buka preview agar user sadar datanya
 
@@ -204,6 +213,17 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             console.error('Failed to read clipboard contents: ', err);
             setError('Gagal membaca dari clipboard. Pastikan izin browser diberikan.');
         }
+    };
+
+    // Handler Expand/Collapse Preview Row
+    const togglePreviewExpand = (name: string) => {
+        const newSet = new Set(expandedPreviews);
+        if (newSet.has(name)) {
+            newSet.delete(name);
+        } else {
+            newSet.add(name);
+        }
+        setExpandedPreviews(newSet);
     };
 
     /**
@@ -254,6 +274,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         setError(null);
         setProgress({ current: 0, total: 0, message: '' });
         setShowPreview(false);
+        setExpandedPreviews(new Set());
     };
 
     /**
@@ -342,6 +363,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         setShowDuplicateWarning(false);
         // Otomatis tutup preview saat mulai agar tampilan bersih
         setShowPreview(false);
+        setExpandedPreviews(new Set());
         
         const isLecturerInputMissing = (answerKeyInputMethod === 'file' && lecturerFiles.length === 0) || (answerKeyInputMethod === 'text' && !lecturerAnswerText.trim());
         if (submissions.length === 0 || isLecturerInputMissing) {
@@ -513,29 +535,65 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                 {showPreview && (
                                     <div className="mt-2 p-0 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden shadow-inner max-h-60 overflow-y-auto custom-scrollbar animate-fade-in">
                                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-                                            <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0">
+                                            <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0 z-10">
                                                 <tr>
-                                                    <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">No</th>
+                                                    <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase w-8">No</th>
                                                     <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">Nama Mahasiswa (ID)</th>
                                                     <th className="px-3 py-2 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">Jml File</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                                 {submissions.map((sub, i) => (
-                                                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                                        <td className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-500 font-mono">{i + 1}</td>
-                                                        <td className="px-3 py-1.5 text-xs text-gray-800 dark:text-gray-300 font-medium truncate max-w-[150px]" title={sub.name}>
-                                                            {sub.name}
-                                                        </td>
-                                                        <td className="px-3 py-1.5 text-xs text-right text-gray-500 dark:text-gray-400">
-                                                            {sub.files.length}
-                                                        </td>
-                                                    </tr>
+                                                    <React.Fragment key={i}>
+                                                        <tr 
+                                                            className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
+                                                            onClick={() => togglePreviewExpand(sub.name)}
+                                                        >
+                                                            <td className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-500 font-mono align-top">{i + 1}</td>
+                                                            <td className="px-3 py-1.5 text-xs text-gray-800 dark:text-gray-300 font-medium align-top">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={`transform transition-transform text-[10px] text-gray-400 ${expandedPreviews.has(sub.name) ? 'rotate-90' : ''}`}>
+                                                                        ▶
+                                                                    </span>
+                                                                    <span className="truncate max-w-[150px]" title={sub.name}>{sub.name}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-3 py-1.5 text-xs text-right text-gray-500 dark:text-gray-400 align-top">
+                                                                <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600">
+                                                                    {sub.files.length}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                        {/* Nested Row for File Details */}
+                                                        {expandedPreviews.has(sub.name) && (
+                                                            <tr className="bg-gray-50/50 dark:bg-gray-800/30">
+                                                                <td colSpan={3} className="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+                                                                    <div className="pl-6 border-l-2 border-gray-200 dark:border-gray-700 ml-2">
+                                                                        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-wider">Rincian File:</p>
+                                                                        <ul className="space-y-1">
+                                                                            {sub.files.map((f, idx) => (
+                                                                                <li key={idx} className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                                                                                    <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                                                                                    <span className="truncate max-w-[200px]" title={f.name}>
+                                                                                        {/* Menampilkan nama file yang sudah dibersihkan dari kode unik (cache buster) */}
+                                                                                        {getDisplayFilename(f.name)}
+                                                                                    </span>
+                                                                                    <span className="text-[9px] text-gray-400 border border-gray-200 dark:border-gray-700 px-1 rounded">
+                                                                                        {(f.size / 1024).toFixed(0)} KB
+                                                                                    </span>
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </React.Fragment>
                                                 ))}
                                             </tbody>
                                         </table>
                                         <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-[10px] text-yellow-800 dark:text-yellow-400 border-t border-yellow-100 dark:border-yellow-900/30 text-center">
-                                            💡 Pastikan nama mahasiswa sesuai dengan folder/file yang Anda unggah.
+                                            💡 Klik nama mahasiswa untuk melihat rincian file di dalamnya.
                                         </div>
                                     </div>
                                 )}

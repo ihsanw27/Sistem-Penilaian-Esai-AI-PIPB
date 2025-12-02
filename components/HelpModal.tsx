@@ -11,11 +11,48 @@ interface HelpModalProps {
  * @component HelpModal
  * @description Modal komprehensif yang menampilkan panduan penggunaan aplikasi dan dokumentasi teknis.
  * Memiliki dua tab: Pengguna (User Guide) dan Pengembang (Developer Docs).
+ * Sekarang mendukung fitur cetak/simpan PDF untuk dokumentasi.
  */
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
     const [activeTab, setActiveTab] = useState<'user' | 'dev'>('user');
 
     if (!isOpen) return null;
+
+    /**
+     * Menangani pencetakan konten bantuan.
+     * Membuka jendela baru, menyuntikkan konten HTML yang relevan, dan memicu dialog cetak browser.
+     */
+    const handlePrint = () => {
+        const printContent = document.getElementById('help-content-area');
+        if (!printContent) return;
+
+        const win = window.open('', '', 'height=700,width=1000');
+        if (!win) return;
+
+        win.document.write('<html><head><title>Panduan Sistem Penilaian AI PIPB</title>');
+        // Menggunakan Tailwind via CDN agar gaya cetak tetap konsisten
+        win.document.write('<script src="https://cdn.tailwindcss.com"></script>');
+        win.document.write(`
+            <style>
+                @media print {
+                    body { font-size: 12pt; color: #000; }
+                    a { text-decoration: none; color: #000; }
+                    .no-print { display: none; }
+                }
+            </style>
+        `);
+        win.document.write('</head><body class="p-8 bg-white text-gray-900">');
+        win.document.write('<h1 class="text-2xl font-bold mb-4 text-center border-b pb-4">Panduan Sistem Penilaian Esai AI PIPB</h1>');
+        win.document.write(printContent.innerHTML);
+        win.document.write('</body></html>');
+        win.document.close();
+        win.focus();
+        
+        // Beri waktu sedikit agar style termuat sebelum dialog cetak muncul
+        setTimeout(() => {
+            win.print();
+        }, 500);
+    };
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -56,7 +93,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-white dark:bg-gray-800 custom-scrollbar">
+                <div id="help-content-area" className="flex-1 overflow-y-auto p-6 sm:p-8 bg-white dark:bg-gray-800 custom-scrollbar">
                     
                     {/* --- TAB PENGGUNA --- */}
                     {activeTab === 'user' && (
@@ -67,8 +104,8 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                 <h3 className="text-lg font-bold text-blue-800 dark:text-blue-300 mb-4 border-b pb-2 dark:border-gray-700">
                                     🚀 Konsep Dasar
                                 </h3>
-                                <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
-                                    Sistem ini menggunakan kecerdasan buatan (AI) Generatif terbaru (Gemini 3 Pro) untuk membaca tulisan tangan atau dokumen digital mahasiswa dan menilainya secara otomatis berdasarkan kunci jawaban yang Anda berikan. Sistem menjamin penilaian yang konsisten, objektif, dan transparan.
+                                <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed text-justify">
+                                    Sistem Penilaian Esai AI PIPB adalah platform cerdas yang dirancang untuk membantu dosen Politeknik Industri Petrokimia Banten dalam menilai jawaban mahasiswa secara objektif, cepat, dan transparan. Menggunakan model <strong>Gemini 3 Pro Preview</strong>, sistem ini mampu membaca berbagai format dokumen (PDF, Word, Gambar, Tulis Tangan) dan membandingkannya dengan kunci jawaban Dosen secara verbatim (kata per kata).
                                 </p>
                             </section>
 
@@ -79,27 +116,27 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
-                                        <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2">1. Pra-pemrosesan Deterministik</h4>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                                            Sistem "Membuka" file ZIP Anda dengan logika baru v4.0. Folder wrapper dibuang. File dalam subfolder dikelompokkan berdasarkan nama folder. File lepas dikelompokkan berdasarkan nama file.
+                                        <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2">1. Pra-pemrosesan File Cerdas</h4>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                                            Saat Anda mengunggah ZIP, sistem secara otomatis mendeteksi strukturnya. Folder diubah menjadi identitas mahasiswa. Sistem juga menerapkan <em>Cache Busting</em> untuk memastikan setiap file dibaca sebagai entitas unik, mencegah kesalahan pembacaan berulang.
                                         </p>
                                     </div>
                                     <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg border border-indigo-100 dark:border-indigo-800">
-                                        <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-2">2. OCR Cache Busting</h4>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                                            Setiap file yang diekstrak diberi sidik jari digital unik. Ini mencegah kesalahan di mana AI "menyangkut" membaca file mahasiswa sebelumnya karena nama file yang sama (misal "page1.jpg").
+                                        <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-2">2. Analisis Konteks (NLP)</h4>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                                            AI membaca seluruh dokumen sekaligus. Ia tidak memerlukan jawaban berurutan. AI akan mencari paragraf yang relevan dengan soal nomor tertentu di mana pun letaknya dalam dokumen.
                                         </p>
                                     </div>
                                     <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800">
-                                        <h4 className="font-bold text-purple-800 dark:text-purple-300 mb-2">3. Pemahaman Konteks (NLP)</h4>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                                            AI membaca seluruh dokumen (multi-halaman) sekaligus. Ia tidak butuh nomor soal urut. Ia membaca "isi" jawaban dan mencocokkannya dengan soal yang relevan secara semantik.
+                                        <h4 className="font-bold text-purple-800 dark:text-purple-300 mb-2">3. Penilaian Objektif</h4>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                                            AI membandingkan jawaban siswa dengan kunci dosen poin demi poin. Skor dihitung secara matematis. Setiap sesi penilaian dijalankan secara terisolasi (stateless) untuk menjamin privasi data antar mahasiswa.
                                         </p>
                                     </div>
                                     <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800">
-                                        <h4 className="font-bold text-green-800 dark:text-green-300 mb-2">4. Penilaian Deterministik</h4>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                                            AI membandingkan jawaban siswa dengan kunci dosen poin demi poin. Skor dihitung secara matematis (0-100). Jika jawaban kosong, sistem menandainya sebagai [TIDAK DIKERJAKAN].
+                                        <h4 className="font-bold text-green-800 dark:text-green-300 mb-2">4. Umpan Balik Verbatim</h4>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                                            Hasil penilaian menyertakan salinan teks asli jawaban siswa (OCR) untuk setiap soal. Ini memungkinkan Dosen memverifikasi bahwa AI membaca bagian yang tepat.
                                         </p>
                                     </div>
                                 </div>
@@ -131,7 +168,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                             <strong className="text-gray-900 dark:text-gray-100">Mulai Penilaian:</strong> Klik tombol "Mulai Penilaian AI". Tunggu proses analisis.
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Review Hasil:</strong> Periksa hasil analisis di panel kanan. Klik "Tampilkan Teks" untuk verifikasi OCR.
+                                            <strong className="text-gray-900 dark:text-gray-100">Review Hasil:</strong> Periksa hasil analisis di panel kanan. Klik "Tampilkan Teks" untuk verifikasi OCR global.
                                         </li>
                                     </ol>
                                 </div>
@@ -162,14 +199,11 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                                     <li>
                                                         <strong>ZIP Individu:</strong> Jika Anda mengunggah ZIP bernama "Budi.zip" yang isinya HANYA gambar-gambar halaman (tanpa folder lain), sistem akan menganggapnya sebagai satu mahasiswa bernama "Budi".
                                                     </li>
-                                                    <li>
-                                                        <strong>Campuran:</strong> ZIP bisa berisi Folder dan File lepas sekaligus.
-                                                    </li>
                                                 </ul>
                                             </div>
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Verifikasi (Manifest Preview):</strong> <span className="text-green-600 dark:text-green-400 font-bold">[FITUR BARU]</span> Setelah unggah, klik tombol "Lihat Daftar Mahasiswa" yang muncul. Pastikan nama-nama mahasiswa terdeteksi dengan benar dan jumlah filenya sesuai. Ini untuk menghindari kesalahan input (misal: File A masuk folder B).
+                                            <strong className="text-gray-900 dark:text-gray-100">Verifikasi (Manifest Preview):</strong> <span className="text-green-600 dark:text-green-400 font-bold">[PENTING]</span> Setelah unggah, klik tombol "Lihat Daftar Mahasiswa" yang muncul. Pastikan nama-nama mahasiswa terdeteksi dengan benar dan jumlah filenya sesuai. Klik baris nama untuk melihat rincian file di dalamnya.
                                         </li>
                                         <li>
                                             <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah kunci jawaban Dosen (berlaku untuk seluruh kelas).
@@ -181,7 +215,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                             <strong className="text-gray-900 dark:text-gray-100">Monitoring:</strong> Pantau progress bar. Sistem memproses 5 mahasiswa sekaligus. Jika macet >15 menit, Anda bisa klik (x) untuk skip manual.
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Selesai:</strong> Unduh Excel laporan. Gunakan Modal Detail untuk melihat perbandingan Soal vs Kunci vs Jawaban Siswa.
+                                            <strong className="text-gray-900 dark:text-gray-100">Selesai:</strong> Unduh Excel laporan yang berisi rekap nilai dan analisis detail per soal.
                                         </li>
                                     </ol>
                                 </div>
@@ -189,12 +223,12 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
 
                             <section>
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 border-b pb-2 dark:border-gray-700">
-                                    💡 Tips & Trik
+                                    💡 Tips & Troubleshooting
                                 </h3>
                                 <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400 list-disc list-inside">
                                     <li><strong>Verifikasi OCR:</strong> Selalu lakukan pengecekan acak (spot check). Klik tombol "Detail" pada hasil siswa, lalu klik "Tampilkan Teks" untuk melihat apa yang dibaca AI.</li>
                                     <li><strong>Jawaban Kosong:</strong> Jika AI memberikan nilai 0 dan tulisan [TIDAK DIKERJAKAN], cek visual file aslinya. Mungkin tulisannya terlalu kabur atau halaman kosong.</li>
-                                    <li><strong>Internet Stabil:</strong> Mode Kelas membutuhkan koneksi internet yang stabil karena mengirim banyak data secara paralel.</li>
+                                    <li><strong>Error 429 (Rate Limit):</strong> Jika proses melambat di akhir, itu normal. Sistem sedang "mengalah" (backoff) agar tidak diblokir Google. Biarkan proses berjalan.</li>
                                 </ul>
                             </section>
                         </div>
@@ -219,46 +253,32 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                 </h3>
                                 <div className="space-y-4 text-gray-700 dark:text-gray-300 font-sans">
                                     <div>
-                                        <h4 className="font-bold">1. File Processing & Cache Busting (`utils/fileUtils.ts`)</h4>
-                                        <p>Logika Deep Fix v4.0 untuk mengatasi konsistensi OCR.</p>
-                                        <ul className="list-disc list-inside ml-4 text-xs mt-1 bg-gray-100 dark:bg-gray-700 p-2 rounded">
-                                            <li><strong>Nuclear Cache Busting:</strong> Setiap file yang diekstrak dari ZIP di-rename secara internal menjadi `Path_Filename_TIMESTAMP_RANDOM`. Ini memaksa browser dan Gemini API melihatnya sebagai objek unik, mencegah browser memberikan cache blob mahasiswa sebelumnya.</li>
-                                            <li><strong>Deterministic Grouping:</strong> Logika penentuan nama mahasiswa tidak lagi menebak-nebak, tetapi secara ketat mengikuti struktur folder atau nama file setelah stripping common root.</li>
+                                        <h4 className="font-bold text-base">1. File Processing & Cache Busting (`utils/fileUtils.ts`)</h4>
+                                        <p className="mt-1">Implementasi Deep Fix untuk konsistensi OCR dan penanganan ZIP yang deterministik.</p>
+                                        <ul className="list-disc list-inside ml-4 text-xs mt-1 bg-gray-100 dark:bg-gray-700 p-2 rounded leading-relaxed">
+                                            <li><strong>Nuclear Cache Busting:</strong> Browser sering melakukan caching agresif pada Blob jika nama file sama. Sistem menambahkan timestamp dan string acak ke setiap nama file yang diekstrak (<code>filename_TIMESTAMP_RANDOM.ext</code>). Ini memaksa browser dan AI melihatnya sebagai resource baru setiap saat.</li>
+                                            <li><strong>Deterministic Grouping:</strong> Logika penentuan nama mahasiswa menggunakan path parsing yang ketat. Common root path dibuang terlebih dahulu. Jika sisa path memiliki folder, nama folder = nama mahasiswa. Jika file ada di root, nama file = nama mahasiswa.</li>
                                         </ul>
                                     </div>
                                     <div>
-                                        <h4 className="font-bold">2. Grading Service (`services/geminiService.ts`)</h4>
-                                        <p>Menggunakan <code>gemini-3-pro-preview</code>. Prompt dirancang dengan teknik <em>Chain-of-Thought</em> implisit dan instruksi deterministik.</p>
-                                        <ul className="list-disc list-inside ml-4 text-xs mt-1">
-                                            <li><strong>Stateless Architecture:</strong> Klien <code>GoogleGenAI</code> diinstansiasi di dalam fungsi <code>gradeAnswer</code> (bukan global). Ini mencegah "Data Bleeding" atau kebocoran state antar request paralel.</li>
-                                            <li><strong>Strict Verbatim Rule:</strong> AI dipaksa menyalin teks asli siswa (OCR) ke dalam JSON output untuk transparansi.</li>
-                                            <li><strong>Retry Strategy:</strong> Menggunakan <em>Exponential Backoff</em> dengan Jitter untuk menangani HTTP 429 saat batch processing.</li>
+                                        <h4 className="font-bold text-base">2. Grading Service (`services/geminiService.ts`)</h4>
+                                        <p className="mt-1">Service layer yang menangani komunikasi dengan Gemini API.</p>
+                                        <ul className="list-disc list-inside ml-4 text-xs mt-1 leading-relaxed">
+                                            <li><strong>Stateless Architecture (Critical):</strong> Objek <code>GoogleGenAI</code> diinstansiasi <strong>di dalam</strong> fungsi <code>gradeAnswer</code>, bukan secara global. Ini mencegah kebocoran state/konteks antar request paralel yang bisa menyebabkan AI "berhalusinasi" data mahasiswa A saat menilai mahasiswa B.</li>
+                                            <li><strong>Prompt Engineering:</strong> Menggunakan teknik instruksi deterministik (Temperature 0) dan One-Shot prompting dengan konteks penuh.</li>
+                                            <li><strong>Robust Retry:</strong> Mengimplementasikan Exponential Backoff dengan Jitter untuk menangani error Rate Limit (429) secara elegan tanpa memutus proses batch.</li>
                                         </ul>
                                     </div>
                                     <div>
-                                        <h4 className="font-bold">3. Batch Concurrency (`components/ClassMode.tsx`)</h4>
-                                        <p>Menggunakan pola <strong>Worker Pool</strong> (bukan Promise.all sederhana). </p>
-                                        <ul className="list-disc list-inside ml-4 text-xs mt-1">
-                                            <li><strong>Concurrency Limit:</strong> 5 Worker.</li>
-                                            <li><strong>Staggered Start:</strong> Jeda 800ms antar worker start untuk mencegah lonjakan request awal.</li>
-                                            <li><strong>Inter-job Cooldown:</strong> Jeda acak antar tugas untuk mendinginkan Rate Limiter.</li>
+                                        <h4 className="font-bold text-base">3. Batch Concurrency (`components/ClassMode.tsx`)</h4>
+                                        <p className="mt-1">Menggunakan pola <strong>Worker Pool</strong> kustom.</p>
+                                        <ul className="list-disc list-inside ml-4 text-xs mt-1 leading-relaxed">
+                                            <li><strong>Concurrency Limit:</strong> Dibatasi 5 worker aktif untuk keseimbangan throughput dan rate limit.</li>
+                                            <li><strong>Staggered Start:</strong> Worker diluncurkan dengan jeda 800ms untuk mencegah lonjakan request awal ("Thundering Herd").</li>
+                                            <li><strong>Manifest Preview:</strong> Data divalidasi dan ditampilkan ke user sebelum masuk ke antrian worker.</li>
                                         </ul>
                                     </div>
                                 </div>
-                            </section>
-
-                            <section>
-                                <h3 className="text-lg font-bold text-purple-700 dark:text-purple-400 mb-3">
-                                    ⚠️ Known Issues & Mitigations
-                                </h3>
-                                <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 font-sans">
-                                    <li>
-                                        <strong>Rate Limits (429):</strong> Gemini API memiliki batas RPM. Sistem mengatasinya dengan retries dan reduced concurrency (5).
-                                    </li>
-                                    <li>
-                                        <strong>Browser Memory:</strong> Memproses ZIP besar (>500MB) bisa membuat browser crash. Disarankan memecah ZIP jika terlalu besar.
-                                    </li>
-                                </ul>
                             </section>
                         </div>
                     )}
@@ -266,7 +286,13 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end">
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end gap-3">
+                    <button
+                        onClick={handlePrint}
+                        className="px-6 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors shadow-sm flex items-center gap-2"
+                    >
+                        <span>🖨️</span> Cetak / Simpan PDF
+                    </button>
                     <button
                         onClick={onClose}
                         className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm"
