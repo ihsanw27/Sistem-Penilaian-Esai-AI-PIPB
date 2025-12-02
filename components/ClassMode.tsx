@@ -12,14 +12,12 @@ import AILoader from './AILoader';
 // SAFETY TIMEOUT: 15 Menit. 
 const SAFETY_TIMEOUT_MS = 15 * 60 * 1000; 
 
-// OPTIMIZED CONCURRENCY LIMIT
-// Updated to 5: This is the safest "sweet spot" for Gemini 2.0 Flash on Free Tier/Auto-scale.
-// Limit 8 was too aggressive for Free Tier and caused 429s.
-const CONCURRENCY_LIMIT = 5;
-
 // MAX FILE SIZE: 10MB
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+// Default Concurrency Limit (Safe for Free Tier + Gemini 3 Pro)
+const DEFAULT_CONCURRENCY = 2;
 
 interface ClassModeProps {
     /** Callback untuk memberi tahu parent (Dashboard) jika ada data aktif (file/hasil) */
@@ -398,6 +396,12 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         const totalSteps = submissions.length;
         setProgress({ current: 0, total: totalSteps, message: `Menginisialisasi antrian cerdas...` });
 
+        // DETERMINE CONCURRENCY FROM SETTINGS
+        // Fallback ke DEFAULT_CONCURRENCY (2) jika user belum setting.
+        const effectiveConcurrency = typeof window !== 'undefined' 
+            ? parseInt(localStorage.getItem('USER_CONCURRENCY_LIMIT') || String(DEFAULT_CONCURRENCY), 10) 
+            : DEFAULT_CONCURRENCY;
+
         try {
             const lecturerAnswerPayload: { parts?: any[], text?: string } = {};
             if (answerKeyInputMethod === 'file') {
@@ -443,7 +447,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             };
 
             const workers = [];
-            for (let w = 0; w < CONCURRENCY_LIMIT; w++) {
+            for (let w = 0; w < effectiveConcurrency; w++) {
                 workers.push(worker(w));
                 // Staggered start to prevent thundering herd
                 await sleep(800); 

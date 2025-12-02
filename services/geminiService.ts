@@ -27,7 +27,7 @@ import { GradeResult } from "../types";
 
 // Fungsi untuk mendapatkan API Key yang valid (Prioritas: LocalStorage > Env Var)
 const getApiKey = (): string => {
-    // 1. Cek LocalStorage (User Settings)
+    // 1. Cek LocalStorage (User Settings) - BYOK Strategy
     const customKey = typeof window !== 'undefined' ? localStorage.getItem('USER_GEMINI_API_KEY') : null;
     if (customKey && customKey.trim().length > 0) {
         return customKey.trim();
@@ -42,9 +42,13 @@ const getApiKey = (): string => {
 
 // Fungsi untuk mendapatkan Model yang dipilih (Prioritas: LocalStorage > Default)
 const getModel = (): string => {
+    // 1. Cek LocalStorage (User Preference)
     const customModel = typeof window !== 'undefined' ? localStorage.getItem('USER_GEMINI_MODEL') : null;
-    // UPDATED DEFAULT: 'gemini-2.0-flash' for better speed and rate limits on free tier.
-    return customModel || 'gemini-2.0-flash';
+    
+    // 2. Default Fallback: 'gemini-3-pro-preview'
+    // Dipilih karena akurasi dan kemampuannya menangani nuansa esai kompleks.
+    // Dipadukan dengan Concurrency=2 pada Mode Kelas agar tetap aman di Free Tier.
+    return customModel || 'gemini-3-pro-preview';
 };
 
 // Definisi tipe untuk bagian konten yang dapat dikirim ke Gemini API.
@@ -59,7 +63,8 @@ type ContentPart = { text: string; } | { inlineData: { data: string; mimeType: s
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // INITIAL BACKOFF: 2000ms.
-// Dikembalikan ke 2000ms untuk keseimbangan responsivitas dan stabilitas.
+// Dikembalikan ke 2000ms untuk menyeimbangkan responsivitas Mode Individu.
+// Untuk Mode Kelas, stabilitas dijamin oleh arsitektur Worker Pool dengan Concurrency rendah (2).
 const INITIAL_BACKOFF_MS = 2000;
 
 /**
@@ -95,7 +100,7 @@ export const gradeAnswer = async (
     // STATELESS INSTANTIATION: Mencegah data bleeding antar request
     const ai = new GoogleGenAI({ apiKey: apiKey });
 
-    // MODEL SELECTION: Menggunakan model dari preferensi user
+    // MODEL SELECTION: Menggunakan model dari preferensi user atau default (Gemini 3 Pro)
     const gradingModel = getModel();
 
     // REKAYASA PROMPT (PROMPT ENGINEERING):

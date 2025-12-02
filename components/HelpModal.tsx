@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { XIcon, UploadIcon, CheckIcon, DownloadIcon, SettingsIcon } from './icons';
@@ -12,6 +13,11 @@ interface HelpModalProps {
  * @component HelpModal
  * @description Modal komprehensif yang menampilkan panduan penggunaan aplikasi dan dokumentasi teknis.
  * Menggunakan React Portal untuk rendering di top-level document body.
+ * 
+ * UPDATE v1.6:
+ * - Dokumentasi disesuaikan dengan konfigurasi default baru: Gemini 3 Pro + Concurrency 2.
+ * - Penjelasan fitur "Opsi Lanjutan" untuk pengaturan konkurensi.
+ * - Penjelasan detail tentang trade-off Kecepatan vs Kecerdasan.
  */
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onOpenSettings }) => {
     const [activeTab, setActiveTab] = useState<'user' | 'dev'>('user');
@@ -106,73 +112,73 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onOpenSettings }
                                 </p>
                             </section>
 
-                            {/* PENGATURAN API KEY (BYOK) */}
+                            {/* PENGATURAN API KEY & MODEL (NEW SECTION) */}
                             <section>
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                                    <span className="text-xl">🔑</span> Pengaturan Kunci API (Disarankan)
+                                    <span className="text-xl">⚙️</span> Konfigurasi Model & Performa
                                 </h3>
-                                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-5 border border-yellow-200 dark:border-yellow-700">
-                                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                                        Secara default, aplikasi menggunakan kuota server bersama yang mungkin lambat atau terbatas. 
-                                        Untuk kinerja maksimal (terutama Mode Kelas), disarankan menggunakan <strong>API Key Google Gemini</strong> Anda sendiri. Ini gratis dan mudah didapat.
-                                    </p>
+                                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm space-y-4">
                                     
-                                    <div className="space-y-2 mb-4">
-                                        <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">Cara Mendapatkan API Key Gratis:</h4>
-                                        <ol className="list-decimal list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1 ml-2">
-                                            <li>Buka <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-600 underline">Google AI Studio</a>.</li>
-                                            <li>Login dengan akun Google Anda.</li>
-                                            <li>Klik tombol <strong>"Create API Key"</strong>.</li>
-                                            <li>Salin kunci yang muncul (dimulai dengan <code>AIza...</code>).</li>
-                                        </ol>
+                                    {/* Pemilihan Model */}
+                                    <div>
+                                        <h4 className="font-bold text-sm text-blue-700 dark:text-blue-400 mb-2">1. Memilih Model (Kecerdasan vs Kecepatan)</h4>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                                            Aplikasi ini diatur secara default ke <strong>Gemini 3 Pro</strong> dengan kecepatan rendah agar aman digunakan secara gratis. Anda dapat mengubahnya di menu Pengaturan:
+                                        </p>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
+                                                <strong className="block text-sm text-blue-800 dark:text-blue-300">🧠 Gemini 3 Pro (Default)</strong>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                                    <strong>Karakteristik:</strong> Sangat Cerdas & Peka Nuansa.
+                                                    <br/><strong>Kondisi:</strong> Diatur berjalan lambat (2 mahasiswa sekaligus) agar tidak sering error pada akun gratis. Cocok untuk akurasi tinggi.
+                                                </p>
+                                            </div>
+                                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-100 dark:border-green-800">
+                                                <strong className="block text-sm text-green-800 dark:text-green-300">⚡ Gemini 2.5 Flash</strong>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                                    <strong>Karakteristik:</strong> Seimbang & Cepat.
+                                                    <br/><strong>Kondisi:</strong> Bisa menilai hingga 5-8 mahasiswa sekaligus. Gunakan ini jika Anda merasa Gemini 3 Pro terlalu lambat untuk menilai kelas besar.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* BYOK Guide */}
+                                    <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+                                        <h4 className="font-bold text-sm text-purple-700 dark:text-purple-400 mb-2">2. Gunakan API Key Sendiri (BYOK)</h4>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                                            Agar tidak berebut kuota server dengan dosen lain, sangat disarankan memasukkan API Key Google pribadi Anda (Gratis).
+                                        </p>
+                                        <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded text-xs space-y-2">
+                                            <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 font-medium">
+                                                <li>Buka <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-600 underline">Google AI Studio</a> & login akun Google.</li>
+                                                <li>Klik <strong>"Create API Key"</strong>.</li>
+                                                <li>Salin kode (contoh: <code>AIzaSyB...</code>).</li>
+                                                <li>Kembali ke aplikasi ini, klik tombol <strong>Pengaturan (⚙️)</strong> di pojok kanan atas.</li>
+                                                <li>Tempel kunci di kolom "Gemini API Key" dan simpan.</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+
+                                    {/* Advanced Settings Guide */}
+                                    <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+                                        <h4 className="font-bold text-sm text-orange-700 dark:text-orange-400 mb-2">3. Pengaturan Lanjutan (Advanced)</h4>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                                            Di menu Pengaturan, terdapat opsi tersembunyi <strong>"Opsi Lanjutan"</strong>. Di sini Anda dapat mengubah jumlah <em>Konkurensi</em> (jumlah file yang diproses bersamaan). 
+                                            <br/><br/>
+                                            <strong>⚠️ Peringatan:</strong> Jangan naikkan angka di atas 2 jika Anda tidak memiliki API Key berbayar, karena akan menyebabkan error "429 Too Many Requests".
+                                        </p>
                                     </div>
 
                                     {onOpenSettings && (
                                         <button 
                                             onClick={onOpenSettings}
-                                            className="px-4 py-2 bg-yellow-100 dark:bg-yellow-800 hover:bg-yellow-200 dark:hover:bg-yellow-700 text-yellow-800 dark:text-yellow-100 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors border border-yellow-300 dark:border-yellow-600"
+                                            className="w-full mt-2 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors border border-gray-300 dark:border-gray-600"
                                         >
                                             <SettingsIcon className="w-4 h-4" />
-                                            Masukkan Key di Pengaturan
+                                            Buka Menu Pengaturan Sekarang
                                         </button>
                                     )}
-                                </div>
-                            </section>
-
-                            {/* Lingkungan Sistem & Performa */}
-                            <section>
-                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 border-b pb-2 dark:border-gray-700">
-                                    💻 Lingkungan Sistem & Performa
-                                </h3>
-                                <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-xl border border-gray-200 dark:border-gray-700 space-y-4">
-                                    <div>
-                                        <h4 className="font-bold text-gray-900 dark:text-gray-100 text-sm mb-2">🌐 Di mana aplikasi berjalan? (Server vs Browser)</h4>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            Aplikasi ini menggunakan arsitektur <strong>Hybrid</strong>:
-                                        </p>
-                                        <ul className="list-disc list-inside ml-2 text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
-                                            <li><strong>Browser Anda (Client-Side):</strong> Semua logika aplikasi, ekstraksi file ZIP, manajemen antrian, dan pembuatan file Excel laporan berjalan <strong>100% di dalam laptop/PC Anda</strong>. Data tidak disimpan di server perantara kami.</li>
-                                            <li><strong>Google Cloud (Server-Side):</strong> Proses "berpikir" (membaca tulisan/OCR dan penilaian) dilakukan dengan mengirim data terenkripsi langsung ke server Google (Gemini API), lalu hasilnya dikembalikan ke Anda.</li>
-                                        </ul>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                                        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-lg">📡</span>
-                                                <span className="font-bold text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wide">Internet</span>
-                                            </div>
-                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Sangat Berpengaruh</p>
-                                            <p className="text-xs text-gray-500 mt-2 leading-relaxed">Kecepatan upload menentukan seberapa cepat file dikirim ke AI. Jika internet lambat, tahap "Mengirim..." akan terasa lama.</p>
-                                        </div>
-                                        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-lg">💻</span>
-                                                <span className="font-bold text-xs text-purple-600 dark:text-purple-400 uppercase tracking-wide">Spek Komputer (RAM/CPU)</span>
-                                            </div>
-                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Berpengaruh</p>
-                                            <p className="text-xs text-gray-500 mt-2 leading-relaxed">RAM dan CPU digunakan untuk mengekstrak ZIP besar dan menampung data di browser. Komputer dengan RAM &lt;4GB mungkin terasa berat saat memproses >50 mahasiswa.</p>
-                                        </div>
-                                    </div>
                                 </div>
                             </section>
 
@@ -185,7 +191,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onOpenSettings }
                                     <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
                                         <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2">1. Pra-pemrosesan File Cerdas</h4>
                                         <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                                            Saat Anda mengunggah ZIP, sistem secara otomatis mendeteksi strukturnya. Folder diubah menjadi identitas mahasiswa. Sistem juga menerapkan <em>Cache Busting</em> untuk memastikan setiap file dibaca sebagai entitas unik, mencegah kesalahan pembacaan berulang.
+                                            Saat Anda mengunggah ZIP, sistem secara otomatis mendeteksi strukturnya. Folder diubah menjadi identitas mahasiswa. Sistem juga menerapkan <em>Cache Busting</em> untuk memastikan setiap file dibaca sebagai entitas unik.
                                         </p>
                                     </div>
                                     <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg border border-indigo-100 dark:border-indigo-800">
@@ -197,7 +203,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onOpenSettings }
                                     <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800">
                                         <h4 className="font-bold text-purple-800 dark:text-purple-300 mb-2">3. Penilaian Objektif & Mekanis</h4>
                                         <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                                            Meskipun AI berperan sebagai "Asisten Dosen" yang sopan, logika penilaiannya dikunci pada <strong>Suhu (Temperature) 0</strong>. Ini berarti AI dilarang "berimajinasi". Ia hanya menilai berdasarkan fakta yang ada di dokumen dibandingkan dengan Kunci Jawaban Anda.
+                                            Meskipun AI berperan sebagai "Asisten Dosen" yang sopan, logika penilaiannya dikunci pada <strong>Suhu (Temperature) 0</strong>. Ini berarti AI dilarang "berimajinasi". Ia hanya menilai berdasarkan fakta.
                                         </p>
                                     </div>
                                     <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800">
@@ -263,28 +269,48 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onOpenSettings }
                                                     <li>
                                                         <strong>Dokumen Lepas (Flat Files):</strong> Jika ZIP berisi banyak PDF/Word di root, setiap file dianggap sebagai 1 Mahasiswa berbeda. Nama file (tanpa ekstensi) akan jadi nama mahasiswa. Contoh: "Siti Aminah.pdf" -> Mhs "Siti Aminah".
                                                     </li>
-                                                    <li>
-                                                        <strong>ZIP Individu:</strong> Jika Anda mengunggah ZIP bernama "Budi.zip" yang isinya HANYA gambar-gambar halaman (tanpa folder lain), sistem akan menganggapnya sebagai satu mahasiswa bernama "Budi".
-                                                    </li>
                                                 </ul>
                                             </div>
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Verifikasi (Manifest Preview):</strong> <span className="text-green-600 dark:text-green-400 font-bold">[PENTING]</span> Setelah unggah, klik tombol "Lihat Daftar Mahasiswa" yang muncul. Pastikan nama-nama mahasiswa terdeteksi dengan benar dan jumlah filenya sesuai. Klik baris nama untuk melihat rincian file di dalamnya (nama file sudah dibersihkan dari kode teknis agar mudah dibaca).
+                                            <strong className="text-gray-900 dark:text-gray-100">Verifikasi (Manifest Preview):</strong> <span className="text-green-600 dark:text-green-400 font-bold">[PENTING]</span> Setelah unggah, klik tombol "Lihat Daftar Mahasiswa". Pastikan jumlah mahasiswa dan filenya sesuai.
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah kunci jawaban Dosen (berlaku untuk seluruh kelas).
+                                            <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah kunci jawaban Dosen.
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Eksekusi:</strong> Klik "Mulai Penilaian AI untuk X Mahasiswa".
+                                            <strong className="text-gray-900 dark:text-gray-100">Eksekusi:</strong> Klik "Mulai Penilaian AI". 
+                                            <span className="block mt-1 text-xs text-blue-600 dark:text-blue-400 italic">
+                                                Catatan: Dengan model default (Gemini 3 Pro), proses akan berjalan dengan kecepatan <strong>2 mahasiswa per menit</strong> untuk keamanan kuota. Mohon bersabar atau ganti model ke Flash di Pengaturan.
+                                            </span>
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Monitoring:</strong> Pantau progress bar. Sistem memproses 8 mahasiswa sekaligus (Optimized Concurrency). Jika macet >15 menit, Anda bisa klik (x) untuk skip manual.
-                                        </li>
-                                        <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Selesai:</strong> Unduh Excel laporan yang berisi rekap nilai dan analisis detail per soal.
+                                            <strong className="text-gray-900 dark:text-gray-100">Selesai:</strong> Unduh Excel laporan.
                                         </li>
                                     </ol>
+                                </div>
+                            </section>
+
+                            {/* Lingkungan Sistem & Performa */}
+                            <section>
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 border-b pb-2 dark:border-gray-700">
+                                    💻 Lingkungan Sistem & Performa
+                                </h3>
+                                <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                                    <p>
+                                        Aplikasi ini berjalan secara <strong>Hybrid (Client-Side + Cloud)</strong>. Performa sangat bergantung pada:
+                                    </p>
+                                    <ul className="list-disc list-inside ml-4 space-y-2">
+                                        <li>
+                                            <strong>Koneksi Internet (Upload):</strong> Kecepatan unggah file mahasiswa ke Google Cloud sangat menentukan seberapa cepat proses dimulai.
+                                        </li>
+                                        <li>
+                                            <strong>Spesifikasi Komputer (RAM/CPU):</strong> Proses ekstraksi ZIP dan pembuatan laporan Excel dilakukan di browser Anda. Komputer dengan RAM &lt; 4GB mungkin mengalami lag saat memproses ratusan file.
+                                        </li>
+                                        <li>
+                                            <strong>Jenis Akun Google AI:</strong> Akun gratis memiliki batas kecepatan (Rate Limit) yang ketat. Akun berbayar (Pay-as-you-go) bisa berjalan jauh lebih cepat dengan menaikkan <em>Concurrency</em> di pengaturan.
+                                        </li>
+                                    </ul>
                                 </div>
                             </section>
 
@@ -307,17 +333,6 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onOpenSettings }
                                     </div>
                                 </div>
                             </section>
-
-                            <section>
-                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 border-b pb-2 dark:border-gray-700">
-                                    💡 Tips & Troubleshooting
-                                </h3>
-                                <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400 list-disc list-inside">
-                                    <li><strong>Verifikasi OCR:</strong> Selalu lakukan pengecekan acak (spot check). Klik tombol "Detail" pada hasil siswa, lalu klik "Tampilkan Teks" untuk melihat apa yang dibaca AI.</li>
-                                    <li><strong>Jawaban Kosong:</strong> Jika AI memberikan nilai 0 dan tulisan [TIDAK DIKERJAKAN], cek visual file aslinya. Mungkin tulisannya terlalu kabur atau halaman kosong.</li>
-                                    <li><strong>Error 429 (Rate Limit):</strong> Jika proses melambat di akhir, itu normal. Sistem sedang "mengalah" (backoff) agar tidak diblokir Google. Biarkan proses berjalan.</li>
-                                </ul>
-                            </section>
                         </div>
                     )}
 
@@ -330,86 +345,72 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onOpenSettings }
                                     <li>Frontend: React 19 + TypeScript</li>
                                     <li>Styling: Tailwind CSS (Dark Mode supported)</li>
                                     <li>AI SDK: @google/genai (Gemini 3 Pro / 2 Flash)</li>
-                                    <li>Utils: xlsx (Excel Export), jszip (Archive handling), mammoth (Word parsing)</li>
+                                    <li>State: React Hooks + LocalStorage Persistence</li>
                                 </ul>
                             </div>
 
                             <section>
-                                <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-3 border-b border-red-200 dark:border-red-900/50 pb-2">
-                                    🛡️ Security & Abuse Prevention
+                                <h3 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-3">
+                                    ⚙️ Configuration Architecture
                                 </h3>
-                                <div className="space-y-4 text-gray-700 dark:text-gray-300 font-sans bg-red-50 dark:bg-red-900/10 p-4 rounded-lg">
-                                    <p className="font-bold">PENTING: Karena aplikasi ini berjalan di sisi klien (Client-Side), API Key Anda dapat terekspos jika tidak diamankan dengan benar.</p>
-                                    
+                                <div className="space-y-4 text-gray-700 dark:text-gray-300 font-sans">
                                     <div>
-                                        <h4 className="font-bold text-base text-gray-900 dark:text-gray-100">1. Mengamankan API Key (Wajib Dilakukan di Google Console)</h4>
-                                        <p className="mt-1 text-xs">Untuk mencegah orang lain mencuri API Key Anda dan menghabiskan kuota billing:</p>
-                                        <ul className="list-decimal list-inside ml-4 text-xs mt-2 space-y-1">
-                                            <li>Buka <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="text-blue-600 underline">Google Cloud Console &gt; Credentials</a>.</li>
-                                            <li>Klik pada API Key yang digunakan aplikasi ini.</li>
-                                            <li>Pada bagian <strong>Application restrictions</strong>, pilih <strong>HTTP referrers (web sites)</strong>.</li>
-                                            <li>Tambahkan domain aplikasi Anda (misal: <code>https://penilaian-ai.politeknik.ac.id/*</code>).</li>
-                                            <li>Simpan. Sekarang, API Key hanya bisa digunakan dari website kampus Anda.</li>
-                                        </ul>
+                                        <h4 className="font-bold text-base">Priority-Based Config (`geminiService.ts`)</h4>
+                                        <p className="mt-1 text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded leading-relaxed">
+                                            Sistem menggunakan logika <em>fallback</em> untuk API Key dan Model:
+                                            <br/>1. <strong>LocalStorage (`USER_GEMINI_API_KEY`)</strong>: Jika ada, ini yang dipakai (BYOK).
+                                            <br/>2. <strong>Environment Variable (`process.env.API_KEY`)</strong>: Jika user tidak set key sendiri, pakai key server default.
+                                            <br/>
+                                            Hal yang sama berlaku untuk model. Default sekarang dikembalikan ke <strong>Gemini 3 Pro</strong> demi akurasi.
+                                        </p>
                                     </div>
-
                                     <div>
-                                        <h4 className="font-bold text-base text-gray-900 dark:text-gray-100">2. Proteksi Kode (Internal Safeguards)</h4>
-                                        <ul className="list-disc list-inside ml-4 text-xs mt-2 space-y-1">
-                                            <li><strong>File Size Limit:</strong> Kode membatasi upload maksimal 10MB per file untuk mencegah DoS/Browser Crash.</li>
-                                            <li><strong>Prompt Injection Defense:</strong> System Instruction (Prompt) telah diperbarui untuk mengabaikan teks jahat dalam dokumen siswa yang mencoba memanipulasi skor (misal: "Abaikan instruksi sebelumnya...").</li>
-                                            <li><strong>Token Cap:</strong> Teks input yang sangat panjang dipotong otomatis untuk mencegah Token Exhaustion.</li>
-                                        </ul>
-                                    </div>
-
-                                     <div>
-                                        <h4 className="font-bold text-base text-gray-900 dark:text-gray-100">3. Environment Configuration</h4>
-                                        <p className="mt-1 text-xs">Pastikan environment variables berikut disetel pada saat build/deployment:</p>
-                                        <ul className="list-disc list-inside ml-4 text-xs mt-2 space-y-1 bg-gray-100 dark:bg-gray-800 p-2 rounded">
-                                            <li><code>API_KEY</code>: Kunci Google Gemini API Anda (dari Google AI Studio).</li>
-                                        </ul>
+                                        <h4 className="font-bold text-base">Rate Limit & Concurrency Strategy</h4>
+                                        <p className="mt-1 text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded leading-relaxed">
+                                            <strong>Default Concurrency: 2</strong>. 
+                                            <br/>
+                                            Angka ini dipilih sebagai <em>"Magic Number"</em> untuk Gemini 3 Pro pada Free Tier. Free Tier biasanya memiliki limit ~2 RPM (Requests Per Minute) untuk model Pro. Dengan worker 2, sistem mengirim request, menunggu proses (~30 detik), lalu mengirim lagi, sehingga secara alami mematuhi limit tersebut tanpa sering terkena error 429.
+                                            <br/><br/>
+                                            Jika user menggunakan Gemini Flash atau API Key berbayar, mereka dapat menaikkan angka ini melalui menu "Opsi Lanjutan".
+                                        </p>
                                     </div>
                                 </div>
                             </section>
 
                             <section>
                                 <h3 className="text-lg font-bold text-purple-700 dark:text-purple-400 mb-3">
-                                    🏗️ Arsitektur Sistem & Logika Bisnis
+                                    🏗️ System Architecture
                                 </h3>
                                 <div className="space-y-4 text-gray-700 dark:text-gray-300 font-sans">
                                     <div>
-                                        <h4 className="font-bold text-base">1. File Processing & Cache Busting (`utils/fileUtils.ts`)</h4>
-                                        <p className="mt-1">Implementasi Deep Fix untuk konsistensi OCR dan penanganan ZIP yang deterministik.</p>
-                                        <ul className="list-disc list-inside ml-4 text-xs mt-1 bg-gray-100 dark:bg-gray-700 p-2 rounded leading-relaxed">
-                                            <li><strong>Nuclear Cache Busting:</strong> Browser sering melakukan caching agresif pada Blob jika nama file sama. Sistem menambahkan timestamp dan string acak ke setiap nama file yang diekstrak (<code>filename_TIMESTAMP_RANDOM.ext</code>). Ini memaksa browser dan AI melihatnya sebagai resource baru setiap saat.</li>
-                                            <li><strong>Deterministic Grouping:</strong> Logika penentuan nama mahasiswa menggunakan path parsing yang ketat. Common root path dibuang terlebih dahulu. Jika sisa path memiliki folder, nama folder = nama mahasiswa. Jika file ada di root, nama file = nama mahasiswa.</li>
-                                        </ul>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-base">2. Clean Filename Visualization</h4>
-                                        <p className="mt-1 text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded leading-relaxed">
-                                            Meskipun file fisik diberi nama acak untuk <em>cache busting</em>, antarmuka pengguna (UI) di fitur Manifest Preview dan hasil penilaian menampilkan "Nama Bersih" (Clean Filename). Fungsi <code>getDisplayFilename</code> menghapus suffix timestamp sehingga user experience tetap natural.
+                                        <h4 className="font-bold text-base">1. Stateless Service Layer</h4>
+                                        <p className="mt-1 text-xs leading-relaxed">
+                                            Objek <code>GoogleGenAI</code> diinstansiasi baru di setiap pemanggilan fungsi <code>gradeAnswer</code>. Ini mencegah <em>data bleeding</em> (kebocoran konteks) antar penilaian siswa yang berbeda saat berjalan paralel.
                                         </p>
                                     </div>
                                     <div>
-                                        <h4 className="font-bold text-base">3. Grading Service (`services/geminiService.ts`)</h4>
-                                        <p className="mt-1">Service layer yang menangani komunikasi dengan Gemini API.</p>
-                                        <ul className="list-disc list-inside ml-4 text-xs mt-1 leading-relaxed">
-                                            <li><strong>Stateless Architecture (Critical):</strong> Objek <code>GoogleGenAI</code> diinstansiasi <strong>di dalam</strong> fungsi <code>gradeAnswer</code>, bukan secara global. Ini mencegah kebocoran state/konteks antar request paralel yang bisa menyebabkan AI "berhalusinasi" data mahasiswa A saat menilai mahasiswa B.</li>
-                                            <li><strong>Model Selection (Settings):</strong> Mendukung pemilihan model dinamis via localStorage. Default adalah Gemini 3 Pro, tapi user bisa memilih Gemini 2.0 Flash untuk kecepatan.</li>
-                                            <li><strong>BYOK Support:</strong> Mendeteksi kunci API kustom di localStorage sebelum menggunakan kunci environment default.</li>
-                                            <li><strong>Robust Retry:</strong> Mengimplementasikan Exponential Backoff dengan Jitter untuk menangani error Rate Limit (429).</li>
-                                        </ul>
+                                        <h4 className="font-bold text-base">2. Deterministic File Processing</h4>
+                                        <p className="mt-1 text-xs leading-relaxed">
+                                            Logika ZIP di <code>fileUtils.ts</code> menggunakan strategi deterministik:
+                                            <br/>- <strong>Folder Grouping:</strong> Jika ZIP berisi folder, nama folder = ID Mahasiswa.
+                                            <br/>- <strong>Flat Files:</strong> Jika ZIP berisi file di root, nama file (minus ekstensi) = ID Mahasiswa.
+                                            <br/>- <strong>Clean Visualization:</strong> Kode unik internal (cache buster) dihapus saat ditampilkan di UI Preview agar mudah dibaca manusia.
+                                        </p>
                                     </div>
-                                    <div>
-                                        <h4 className="font-bold text-base">4. Batch Concurrency (`components/ClassMode.tsx`)</h4>
-                                        <p className="mt-1">Menggunakan pola <strong>Worker Pool</strong> kustom.</p>
-                                        <ul className="list-disc list-inside ml-4 text-xs mt-1 leading-relaxed">
-                                            <li><strong>Optimized Concurrency Limit (8):</strong> Berkat arsitektur <em>stateless</em> yang aman, konkurensi ditingkatkan dari 5 menjadi 8. Ini meningkatkan throughput sekitar 30-40% pada akun standar tanpa memicu 429 berlebihan.</li>
-                                            <li><strong>Staggered Start:</strong> Worker diluncurkan dengan jeda 800ms untuk mencegah lonjakan request awal ("Thundering Herd").</li>
-                                            <li><strong>Manifest Preview:</strong> Data divalidasi dan ditampilkan ke user sebelum masuk ke antrian worker.</li>
-                                        </ul>
-                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-3 border-b border-red-200 dark:border-red-900/50 pb-2">
+                                    🛡️ Security (Client-Side)
+                                </h3>
+                                <div className="space-y-2 text-gray-700 dark:text-gray-300 font-sans text-xs">
+                                    <p>Karena aplikasi ini berjalan di browser (tanpa backend proxy):</p>
+                                    <ul className="list-disc list-inside ml-4 space-y-1">
+                                        <li><strong>API Key Exposure:</strong> Jika menggunakan default env key, amankan via HTTP Referrer restrictions di Google Cloud Console.</li>
+                                        <li><strong>File Validation:</strong> Validasi ukuran (10MB) dan tipe file dilakukan di sisi klien sebelum upload.</li>
+                                        <li><strong>Prompt Injection:</strong> System Prompt memuat instruksi defensif untuk mengabaikan teks manipulatif dari dokumen siswa.</li>
+                                    </ul>
                                 </div>
                             </section>
                         </div>

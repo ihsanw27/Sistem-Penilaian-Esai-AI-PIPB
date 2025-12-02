@@ -71,9 +71,6 @@ const GradingDashboard: React.FC = () => {
                     <div className={`font-bold text-lg ${mode === 'single' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400'}`}>
                         Mode Individu
                     </div>
-                    <div className={`text-xs mt-1 ${mode === 'single' ? 'text-blue-600/80 dark:text-blue-300/70' : 'text-gray-500 dark:text-gray-500'}`}>
-                        Nilai satu mahasiswa secara mendalam. Cocok untuk review detail.
-                    </div>
                 </button>
                 
                 <button
@@ -86,9 +83,6 @@ const GradingDashboard: React.FC = () => {
                 >
                     <div className={`font-bold text-lg ${mode === 'class' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400'}`}>
                         Mode Kelas (Massal)
-                    </div>
-                    <div className={`text-xs mt-1 ${mode === 'class' ? 'text-blue-600/80 dark:text-blue-300/70' : 'text-gray-500 dark:text-gray-500'}`}>
-                        Nilai banyak file sekaligus. Hemat waktu dengan pemrosesan paralel.
                     </div>
                 </button>
             </div>
