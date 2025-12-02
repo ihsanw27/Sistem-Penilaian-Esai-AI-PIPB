@@ -1,26 +1,19 @@
 
 import React, { useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import GradingSystem from './GradingSystem';
 import ClassMode from './ClassMode';
 
 /**
  * @component GradingDashboard
  * @description Komponen kontainer utama untuk sistem penilaian.
- * 
- * TANGGUNG JAWAB UTAMA:
- * 1. **Manajemen Mode**: Mengelola perpindahan antara 'Mode Individu' dan 'Mode Kelas'.
- * 2. **Perlindungan Data**: Memantau apakah mode saat ini memiliki data aktif ("Dirty State").
- *    Jika pengguna mencoba berpindah mode saat ada data, dashboard akan menampilkan peringatan
- *    bahwa data akan di-reset.
- * 
- * @returns {React.ReactElement} Komponen Dashboard yang dirender.
+ * Menggunakan React Portal untuk modal konfirmasi.
  */
 const GradingDashboard: React.FC = () => {
     // State untuk mengelola mode aktif saat ini: 'single' atau 'class'.
     const [mode, setMode] = useState<'single' | 'class'>('single');
     
     // State untuk melacak apakah mode aktif saat ini memiliki data (file/hasil).
-    // Jika true, kita harus memperingatkan pengguna sebelum mengganti mode.
     const [isDirty, setIsDirty] = useState<boolean>(false);
     
     // State untuk mengelola visibilitas modal konfirmasi ganti mode.
@@ -39,8 +32,6 @@ const GradingDashboard: React.FC = () => {
 
     /**
      * Menangani permintaan pengguna untuk mengganti mode.
-     * Jika aman (tidak ada data), ganti langsung.
-     * Jika tidak aman (ada data), tampilkan konfirmasi.
      */
     const requestModeSwitch = (targetMode: 'single' | 'class') => {
         if (mode === targetMode) return; // Tidak ada perubahan
@@ -103,7 +94,6 @@ const GradingDashboard: React.FC = () => {
             </div>
             
             {/* Render Kondisional berdasarkan mode yang dipilih */}
-            {/* onDataDirty diteruskan ke anak agar mereka bisa melapor status data */}
             <div className="mt-4 animate-fade-in">
                 {mode === 'single' ? (
                     <GradingSystem onDataDirty={handleDataDirty} />
@@ -112,9 +102,9 @@ const GradingDashboard: React.FC = () => {
                 )}
             </div>
 
-            {/* Modal Konfirmasi Ganti Mode */}
-            {showConfirmModal && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            {/* Modal Konfirmasi Ganti Mode - PORTAL */}
+            {showConfirmModal && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl border border-gray-200 dark:border-gray-700 transform transition-all scale-100">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full">
@@ -147,7 +137,8 @@ const GradingDashboard: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

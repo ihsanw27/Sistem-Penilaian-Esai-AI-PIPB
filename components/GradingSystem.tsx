@@ -5,6 +5,7 @@ import { gradeAnswer } from '../services/geminiService';
 import { GradeResult } from '../types';
 import { UploadIcon, CheckIcon, XIcon, PaperclipIcon, ClipboardIcon } from './icons';
 import { extractTextFromOfficeFile } from '../utils/officeFileUtils';
+import AILoader from './AILoader';
 
 interface SingleStudentGraderProps {
     /** Callback untuk memberi tahu parent (Dashboard) jika ada data aktif (file/hasil) */
@@ -438,15 +439,11 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                     )}
                     
                     {isLoading && (
-                         <div className="flex-grow flex flex-col items-center justify-center space-y-4">
-                            <div className="relative w-20 h-20">
-                                <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-200 dark:border-blue-800 rounded-full"></div>
-                                <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-600 dark:border-blue-400 rounded-full border-t-transparent animate-spin"></div>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-lg font-bold text-gray-700 dark:text-gray-300 animate-pulse">Sedang Menganalisis...</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">AI sedang membaca dokumen dan menilai jawaban.</p>
-                            </div>
+                         <div className="flex-grow flex flex-col items-center justify-center">
+                            <AILoader 
+                                status="AI Sedang Berpikir..." 
+                                subStatus="Membaca dokumen, menganalisis jawaban, dan mencocokkan dengan kunci..." 
+                            />
                         </div>
                     )}
 

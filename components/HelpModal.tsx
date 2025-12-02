@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { XIcon, UploadIcon, CheckIcon, DownloadIcon } from './icons';
 
 interface HelpModalProps {
@@ -10,8 +11,7 @@ interface HelpModalProps {
 /**
  * @component HelpModal
  * @description Modal komprehensif yang menampilkan panduan penggunaan aplikasi dan dokumentasi teknis.
- * Memiliki dua tab: Pengguna (User Guide) dan Pengembang (Developer Docs).
- * Sekarang mendukung fitur cetak/simpan PDF untuk dokumentasi.
+ * Menggunakan React Portal untuk rendering di top-level document body.
  */
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
     const [activeTab, setActiveTab] = useState<'user' | 'dev'>('user');
@@ -20,7 +20,6 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
 
     /**
      * Menangani pencetakan konten bantuan.
-     * Membuka jendela baru, menyuntikkan konten HTML yang relevan, dan memicu dialog cetak browser.
      */
     const handlePrint = () => {
         const printContent = document.getElementById('help-content-area');
@@ -30,7 +29,6 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         if (!win) return;
 
         win.document.write('<html><head><title>Panduan Sistem Penilaian AI PIPB</title>');
-        // Menggunakan Tailwind via CDN agar gaya cetak tetap konsisten
         win.document.write('<script src="https://cdn.tailwindcss.com"></script>');
         win.document.write(`
             <style>
@@ -48,13 +46,12 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         win.document.close();
         win.focus();
         
-        // Beri waktu sedikit agar style termuat sebelum dialog cetak muncul
         setTimeout(() => {
             win.print();
         }, 500);
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white dark:bg-gray-800 w-full max-w-4xl h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 animate-scale-in">
                 
@@ -165,9 +162,9 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                         </p>
                                     </div>
                                     <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800">
-                                        <h4 className="font-bold text-purple-800 dark:text-purple-300 mb-2">3. Penilaian Objektif</h4>
+                                        <h4 className="font-bold text-purple-800 dark:text-purple-300 mb-2">3. Penilaian Objektif & Mekanis</h4>
                                         <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                                            AI membandingkan jawaban siswa dengan kunci dosen poin demi poin. Skor dihitung secara matematis. Setiap sesi penilaian dijalankan secara terisolasi (stateless) untuk menjamin privasi data antar mahasiswa.
+                                            Meskipun AI berperan sebagai "Asisten Dosen" yang sopan, logika penilaiannya dikunci pada <strong>Suhu (Temperature) 0</strong>. Ini berarti AI dilarang "berimajinasi". Ia hanya menilai berdasarkan fakta yang ada di dokumen dibandingkan dengan Kunci Jawaban Anda.
                                         </p>
                                     </div>
                                     <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800">
@@ -240,7 +237,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                             </div>
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Verifikasi (Manifest Preview):</strong> <span className="text-green-600 dark:text-green-400 font-bold">[PENTING]</span> Setelah unggah, klik tombol "Lihat Daftar Mahasiswa" yang muncul. Pastikan nama-nama mahasiswa terdeteksi dengan benar dan jumlah filenya sesuai. Klik baris nama untuk melihat rincian file di dalamnya.
+                                            <strong className="text-gray-900 dark:text-gray-100">Verifikasi (Manifest Preview):</strong> <span className="text-green-600 dark:text-green-400 font-bold">[PENTING]</span> Setelah unggah, klik tombol "Lihat Daftar Mahasiswa" yang muncul. Pastikan nama-nama mahasiswa terdeteksi dengan benar dan jumlah filenya sesuai. Klik baris nama untuk melihat rincian file di dalamnya (nama file sudah dibersihkan dari kode teknis agar mudah dibaca).
                                         </li>
                                         <li>
                                             <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah kunci jawaban Dosen (berlaku untuk seluruh kelas).
@@ -356,16 +353,22 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                         </ul>
                                     </div>
                                     <div>
-                                        <h4 className="font-bold text-base">2. Grading Service (`services/geminiService.ts`)</h4>
+                                        <h4 className="font-bold text-base">2. Clean Filename Visualization</h4>
+                                        <p className="mt-1 text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded leading-relaxed">
+                                            Meskipun file fisik diberi nama acak untuk <em>cache busting</em>, antarmuka pengguna (UI) di fitur Manifest Preview dan hasil penilaian menampilkan "Nama Bersih" (Clean Filename). Fungsi <code>getDisplayFilename</code> menghapus suffix timestamp sehingga user experience tetap natural.
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-base">3. Grading Service (`services/geminiService.ts`)</h4>
                                         <p className="mt-1">Service layer yang menangani komunikasi dengan Gemini API.</p>
                                         <ul className="list-disc list-inside ml-4 text-xs mt-1 leading-relaxed">
                                             <li><strong>Stateless Architecture (Critical):</strong> Objek <code>GoogleGenAI</code> diinstansiasi <strong>di dalam</strong> fungsi <code>gradeAnswer</code>, bukan secara global. Ini mencegah kebocoran state/konteks antar request paralel yang bisa menyebabkan AI "berhalusinasi" data mahasiswa A saat menilai mahasiswa B.</li>
                                             <li><strong>Prompt Engineering:</strong> Menggunakan teknik instruksi deterministik (Temperature 0) dan One-Shot prompting dengan konteks penuh.</li>
-                                            <li><strong>Robust Retry:</strong> Mengimplementasikan Exponential Backoff dengan Jitter untuk menangani error Rate Limit (429) secara elegan tanpa memutus proses batch.</li>
+                                            <li><strong>Robust Retry:</strong> Mengimplementasikan Exponential Backoff dengan Jitter untuk menangani error Rate Limit (429).</li>
                                         </ul>
                                     </div>
                                     <div>
-                                        <h4 className="font-bold text-base">3. Batch Concurrency (`components/ClassMode.tsx`)</h4>
+                                        <h4 className="font-bold text-base">4. Batch Concurrency (`components/ClassMode.tsx`)</h4>
                                         <p className="mt-1">Menggunakan pola <strong>Worker Pool</strong> kustom.</p>
                                         <ul className="list-disc list-inside ml-4 text-xs mt-1 leading-relaxed">
                                             <li><strong>Optimized Concurrency Limit (8):</strong> Berkat arsitektur <em>stateless</em> yang aman, konkurensi ditingkatkan dari 5 menjadi 8. Ini meningkatkan throughput sekitar 30-40% pada akun standar tanpa memicu 429 berlebihan.</li>
@@ -396,7 +399,8 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

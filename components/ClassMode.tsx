@@ -1,11 +1,13 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { fileToBase64, processUploadedFiles, processClassFiles } from '../utils/fileUtils';
 import { gradeAnswer } from '../services/geminiService';
 import { GradeResult, StudentSubmission } from '../types';
 import { UploadIcon, PaperclipIcon, DownloadIcon, XIcon, CheckIcon, ClipboardIcon } from './icons';
 import { extractTextFromOfficeFile } from '../utils/officeFileUtils';
 import { generateCsv, downloadCsv } from '../utils/csvUtils';
+import AILoader from './AILoader';
 
 // SAFETY TIMEOUT: 15 Menit. 
 const SAFETY_TIMEOUT_MS = 15 * 60 * 1000; 
@@ -13,7 +15,6 @@ const SAFETY_TIMEOUT_MS = 15 * 60 * 1000;
 // OPTIMIZED CONCURRENCY LIMIT
 // Karena arsitektur service sekarang Stateless (Isolated), kita bisa meningkatkan konkurensi.
 // Limit 8 adalah "Sweet Spot" untuk akun Free/Pay-as-you-go standar pada model Gemini 3 Pro.
-// Jika dinaikkan >10, risiko Error 429 (Rate Limit) meningkat drastis yang justru memperlambat total waktu.
 const CONCURRENCY_LIMIT = 8;
 
 // MAX FILE SIZE: 10MB
@@ -298,7 +299,6 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
 
     /**
      * LOGIKA PENILAIAN (SATU SUBMISSION).
-     * Submission bisa berisi 1 file atau banyak file (dari folder).
      */
     const gradeSubmission = useCallback(async (
         submission: StudentSubmission,
@@ -311,7 +311,6 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         const gradingPromise = async () => {
             try {
                 // Proses semua file dalam submission ini menjadi parts
-                // Fix: Pastikan file yang diproses benar-benar milik submission ini
                 const studentFileParts = await processFilesToParts(submission.files);
                 
                 const gradingResult = await gradeAnswer(studentFileParts, lecturerAnswerPayload);
@@ -767,6 +766,13 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                         )}
                         {isLoading && (
                             <div className="w-full bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg mb-4 border border-blue-100 dark:border-blue-800">
+                                <div className="flex justify-center mb-4">
+                                     <AILoader 
+                                        status="AI Sedang Bekerja (Mode Massal)" 
+                                        subStatus="Mohon tunggu, sistem sedang menilai seluruh mahasiswa secara paralel..."
+                                    />
+                                </div>
+
                                 <div className="flex justify-between items-center mb-2 text-sm">
                                     <span className="text-blue-800 dark:text-blue-300 font-bold">{progress.message}</span>
                                     <div className="flex items-center gap-3">
@@ -929,9 +935,9 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                  </div>
             </div>
 
-             {/* Modal Peringatan Duplikasi */}
-             {showDuplicateWarning && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+             {/* Modal Peringatan Duplikasi - PORTAL */}
+             {showDuplicateWarning && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl border border-yellow-300 dark:border-yellow-700 transform transition-all scale-100">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="bg-yellow-100 dark:bg-yellow-900/30 p-2 rounded-full">
@@ -969,36 +975,40 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
-            {/* Modal Detail */}
-            {selectedResult && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-gray-800 shadow-2xl w-full h-full sm:h-[90vh] sm:rounded-xl sm:max-w-[95vw] xl:max-w-[90vw] flex flex-col overflow-hidden animate-scale-in transition-colors duration-200">
-                        {/* Header */}
-                        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 truncate pr-4">
+            {/* Smart Viewport Modal (Updated Card Style) - PORTAL */}
+            {selectedResult && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-[95vw] lg:max-w-[90vw] h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 animate-scale-in">
+                        
+                        {/* Header Fixed */}
+                        <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 shrink-0">
+                            <div className="overflow-hidden">
+                                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 truncate pr-4">
                                     Hasil Analisis: {selectedResult.fileName}
                                 </h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Mode Detail & Verifikasi</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span> Mode Detail & Verifikasi
+                                </p>
                             </div>
                             <button 
                                 onClick={() => setSelectedResult(null)}
-                                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
+                                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm"
                             >
                                 <XIcon className="w-6 h-6" />
                             </button>
                         </div>
 
                         {/* Konten Scrollable */}
-                        <div className="p-6 overflow-y-auto space-y-6 bg-white dark:bg-gray-800 flex-grow">
-                             {/* Header Skor */}
-                            <div className="text-center p-4 bg-gradient-to-b from-blue-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-xl border border-blue-100 dark:border-gray-600">
-                                <span className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Nilai Akhir</span>
-                                <div className={`text-6xl font-extrabold ${getGradeColor(selectedResult.grade)} mt-1`}>
-                                    {selectedResult.grade}<span className="text-2xl text-gray-400 dark:text-gray-500 font-normal">/100</span>
+                        <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-8 bg-white dark:bg-gray-800 custom-scrollbar">
+                             {/* Header Skor Big */}
+                            <div className="text-center p-6 bg-gradient-to-b from-blue-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-2xl border border-blue-100 dark:border-gray-600 shadow-sm">
+                                <span className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Nilai Akhir</span>
+                                <div className={`text-7xl sm:text-8xl font-black ${getGradeColor(selectedResult.grade)} mt-2 tracking-tighter`}>
+                                    {selectedResult.grade}<span className="text-3xl text-gray-300 dark:text-gray-600 font-light">/100</span>
                                 </div>
                             </div>
 
@@ -1010,23 +1020,24 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                         className="w-full flex justify-between items-center p-4 bg-blue-50/50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors text-left"
                                     >
                                         <div className="flex items-center space-x-3">
-                                            <span className="text-xl bg-white dark:bg-gray-700 p-1 rounded-full shadow-sm">🔍</span>
+                                            <span className="text-2xl bg-white dark:bg-gray-700 p-2 rounded-full shadow-sm">🔍</span>
                                             <div>
-                                                <span className="font-bold text-blue-900 dark:text-blue-200 block">Cek Bacaan AI (OCR)</span>
-                                                <span className="text-xs text-blue-600 dark:text-blue-400">Klik untuk melihat apa yang dibaca AI dari file asli</span>
+                                                <span className="font-bold text-blue-900 dark:text-blue-200 block text-lg">Cek Bacaan AI (OCR)</span>
+                                                <span className="text-sm text-blue-600 dark:text-blue-400">Klik untuk memverifikasi teks asli yang dibaca sistem</span>
                                             </div>
                                         </div>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold text-center min-w-[120px] inline-block ${showOcr ? 'bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200' : 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-gray-600'}`}>
+                                        <span className={`px-4 py-1.5 rounded-full text-xs font-bold text-center min-w-[140px] inline-block shadow-sm transition-all ${showOcr ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-gray-600'}`}>
                                             {showOcr ? 'Sembunyikan Teks' : 'Tampilkan Teks'}
                                         </span>
                                     </button>
                                     {showOcr && (
-                                        <div className="p-5 bg-white dark:bg-gray-800 border-t border-blue-100 dark:border-gray-600">
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded border border-yellow-100 dark:border-yellow-900/30">
-                                                <strong>Info:</strong> Ini adalah teks mentah yang diekstrak AI. Jika ada kesalahan penilaian, cek apakah tulisan di sini sesuai dengan dokumen asli.
+                                        <div className="p-6 bg-white dark:bg-gray-800 border-t border-blue-100 dark:border-gray-600 animate-fade-in">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border border-yellow-100 dark:border-yellow-900/30 flex gap-2">
+                                                <span>ℹ️</span>
+                                                <span>Ini adalah teks mentah yang diekstrak AI. Jika ada kesalahan penilaian, cek apakah tulisan di sini sesuai dengan dokumen asli.</span>
                                             </p>
-                                            <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-inner">
-                                                <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono max-h-80 overflow-y-auto custom-scrollbar leading-relaxed">
+                                            <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-lg border border-gray-200 dark:border-gray-700 shadow-inner">
+                                                <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono max-h-96 overflow-y-auto custom-scrollbar leading-relaxed">
                                                     {selectedResult.studentText}
                                                 </pre>
                                             </div>
@@ -1037,69 +1048,79 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
 
                              {/* Feedback Detail */}
                              <div>
-                                <h4 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2 text-lg border-b dark:border-gray-700 pb-2">
-                                    <CheckIcon className="w-5 h-5 text-green-500 dark:text-green-400" />
+                                <h4 className="font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2 text-xl border-b dark:border-gray-700 pb-3">
+                                    <CheckIcon className="w-6 h-6 text-green-500 dark:text-green-400" />
                                     Rincian Analisis Per Soal
                                 </h4>
-                                <div className="space-y-6">
+                                <div className="space-y-8">
                                     {selectedResult.detailedFeedback.map((item, idx) => {
                                         const isEmptyAnswer = item.studentAnswer?.includes('[TIDAK DIKERJAKAN]');
 
                                         return (
-                                            <div key={idx} className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200 hover:border-blue-300 dark:hover:border-blue-500">
-                                                <div className="flex justify-between items-start mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">
-                                                    <span className="font-black text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded">Soal #{item.questionNumber}</span>
+                                            <div key={idx} className="p-6 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200 hover:border-blue-300 dark:hover:border-blue-500">
+                                                <div className="flex justify-between items-start mb-5 border-b border-gray-100 dark:border-gray-700 pb-3">
+                                                    <span className="font-black text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 px-4 py-1.5 rounded-lg shadow-sm">Soal #{item.questionNumber}</span>
                                                     <div className="text-right">
                                                         {isEmptyAnswer ? (
-                                                            <span className="text-xs font-bold px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded uppercase tracking-wide">KOSONG</span>
+                                                            <span className="text-xs font-bold px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-lg uppercase tracking-wide">KOSONG</span>
                                                         ) : (
-                                                            <span className={`text-xl font-bold ${getGradeColor(item.score)}`}>
+                                                            <span className={`text-2xl font-bold ${getGradeColor(item.score)}`}>
                                                                 {item.score}/100
                                                             </span>
                                                         )}
                                                     </div>
                                                 </div>
 
-                                                {item.questionText && (
-                                                    <div className="mb-4">
-                                                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 block">Pertanyaan</span>
-                                                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border-l-4 border-blue-400 dark:border-blue-600 text-sm text-blue-900 dark:text-blue-200 font-medium">
-                                                            {item.questionText}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {item.lecturerAnswer && (
-                                                    <div className="mb-4">
-                                                        <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest mb-1 block">Standar Jawaban Dosen</span>
-                                                        <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border-l-4 border-green-400 dark:border-green-600 text-sm text-green-900 dark:text-green-200 italic">
-                                                            {item.lecturerAnswer}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {item.studentAnswer && (
-                                                    <div className="mb-4">
-                                                        <div className="flex justify-between items-center mb-1">
-                                                            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Jawaban Mahasiswa (Terbaca)</span>
-                                                            {!isEmptyAnswer && <span className="text-[10px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Salinan Lengkap</span>}
-                                                        </div>
-                                                        {isEmptyAnswer ? (
-                                                            <div className="p-4 bg-gray-50 dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 italic text-sm">
-                                                                <span>🚫</span>
-                                                                <span>Tidak ada jawaban terdeteksi untuk soal ini.</span>
+                                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                                    {/* Kiri: Konteks Soal & Kunci */}
+                                                    <div className="space-y-4">
+                                                        {item.questionText && (
+                                                            <div>
+                                                                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 block">Pertanyaan</span>
+                                                                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border-l-4 border-blue-400 dark:border-blue-600 text-sm text-blue-900 dark:text-blue-200 font-medium leading-relaxed">
+                                                                    {item.questionText}
+                                                                </div>
                                                             </div>
-                                                        ) : (
-                                                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-3 rounded-lg shadow-inner">
-                                                                <p className="text-sm text-gray-800 dark:text-gray-200 font-mono whitespace-pre-wrap leading-relaxed">{item.studentAnswer}</p>
+                                                        )}
+
+                                                        {item.lecturerAnswer && (
+                                                            <div>
+                                                                <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest mb-1 block">Standar Jawaban Dosen</span>
+                                                                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border-l-4 border-green-400 dark:border-green-600 text-sm text-green-900 dark:text-green-200 italic leading-relaxed">
+                                                                    {item.lecturerAnswer}
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
-                                                )}
 
-                                                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
-                                                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest mb-1 block">Analisis & Umpan Balik AI</span>
-                                                    <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{item.feedback}</p>
+                                                    {/* Kanan: Jawaban Mhs & Analisis */}
+                                                    <div className="space-y-4">
+                                                        {item.studentAnswer && (
+                                                            <div>
+                                                                <div className="flex justify-between items-center mb-1">
+                                                                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Jawaban Mahasiswa</span>
+                                                                    {!isEmptyAnswer && <span className="text-[10px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Salinan Lengkap</span>}
+                                                                </div>
+                                                                {isEmptyAnswer ? (
+                                                                    <div className="p-6 bg-gray-50 dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 italic text-sm">
+                                                                        <span>🚫</span>
+                                                                        <span>Tidak ada jawaban terdeteksi.</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-4 rounded-xl shadow-inner border-l-4 border-l-gray-400 dark:border-l-gray-500">
+                                                                        <p className="text-sm text-gray-800 dark:text-gray-200 font-mono whitespace-pre-wrap leading-relaxed">{item.studentAnswer}</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="pt-2">
+                                                            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest mb-2 block">Analisis AI</span>
+                                                            <div className="bg-purple-50 dark:bg-purple-900/10 p-4 rounded-xl border border-purple-100 dark:border-purple-800/30">
+                                                                <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">{item.feedback}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -1108,27 +1129,28 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                             </div>
 
                             {/* Saran Pengembangan */}
-                            <div className="p-5 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50">
-                                <h4 className="font-bold text-yellow-800 dark:text-yellow-300 mb-2 flex items-center gap-2">
-                                    <span className="text-xl">💡</span> Saran Pengembangan Diri
+                            <div className="p-6 rounded-2xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 shadow-sm">
+                                <h4 className="font-bold text-yellow-800 dark:text-yellow-300 mb-3 flex items-center gap-2 text-lg">
+                                    <span className="text-2xl">💡</span> Saran Pengembangan Diri
                                 </h4>
-                                <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap pl-8">
+                                <p className="text-base text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap pl-10 border-l-2 border-yellow-300 dark:border-yellow-700 ml-2">
                                     {selectedResult.improvements}
                                 </p>
                             </div>
                         </div>
 
-                        {/* Footer Modal */}
-                        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end">
+                        {/* Footer Fixed */}
+                        <div className="p-5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end shrink-0">
                             <button 
                                 onClick={() => setSelectedResult(null)}
-                                className="px-6 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
+                                className="px-8 py-3 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-xl font-bold transition-all shadow-sm hover:shadow-md"
                             >
-                                Tutup
+                                Tutup Panel Detail
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
