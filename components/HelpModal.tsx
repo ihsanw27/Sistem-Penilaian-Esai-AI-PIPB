@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { XIcon, UploadIcon, CheckIcon, DownloadIcon } from './icons';
 
@@ -201,7 +202,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                             <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah file kunci jawaban Dosen atau ketik manual pada kotak teks.
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Mulai Penilaian:</strong> Selesaikan reCAPTCHA ("Saya bukan robot"), lalu klik tombol "Mulai Penilaian AI".
+                                            <strong className="text-gray-900 dark:text-gray-100">Mulai Penilaian:</strong> Klik tombol "Mulai Penilaian AI".
                                         </li>
                                         <li>
                                             <strong className="text-gray-900 dark:text-gray-100">Review Hasil:</strong> Periksa hasil analisis di panel kanan. Klik "Tampilkan Teks" untuk verifikasi OCR global.
@@ -245,7 +246,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                             <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah kunci jawaban Dosen (berlaku untuk seluruh kelas).
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Eksekusi:</strong> Selesaikan verifikasi reCAPTCHA, lalu klik "Mulai Penilaian AI untuk X Mahasiswa".
+                                            <strong className="text-gray-900 dark:text-gray-100">Eksekusi:</strong> Klik "Mulai Penilaian AI untuk X Mahasiswa".
                                         </li>
                                         <li>
                                             <strong className="text-gray-900 dark:text-gray-100">Monitoring:</strong> Pantau progress bar. Sistem memproses 8 mahasiswa sekaligus (Optimized Concurrency). Jika macet >15 menit, Anda bisa klik (x) untuk skip manual.
@@ -328,7 +329,6 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                             <li><strong>File Size Limit:</strong> Kode membatasi upload maksimal 10MB per file untuk mencegah DoS/Browser Crash.</li>
                                             <li><strong>Prompt Injection Defense:</strong> System Instruction (Prompt) telah diperbarui untuk mengabaikan teks jahat dalam dokumen siswa yang mencoba memanipulasi skor (misal: "Abaikan instruksi sebelumnya...").</li>
                                             <li><strong>Token Cap:</strong> Teks input yang sangat panjang dipotong otomatis untuk mencegah Token Exhaustion.</li>
-                                            <li><strong>reCAPTCHA v3 (Invisible):</strong> Aplikasi menggunakan Google reCAPTCHA v3 untuk memverifikasi interaksi pengguna secara tak terlihat.</li>
                                         </ul>
                                     </div>
 
@@ -337,7 +337,6 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                         <p className="mt-1 text-xs">Pastikan environment variables berikut disetel pada saat build/deployment:</p>
                                         <ul className="list-disc list-inside ml-4 text-xs mt-2 space-y-1 bg-gray-100 dark:bg-gray-800 p-2 rounded">
                                             <li><code>API_KEY</code>: Kunci Google Gemini API Anda (dari Google AI Studio).</li>
-                                            <li><code>RECAPTCHA_SITE_KEY</code>: Site Key Google reCAPTCHA v3 Anda (dari Google Cloud Console).</li>
                                         </ul>
                                     </div>
                                 </div>

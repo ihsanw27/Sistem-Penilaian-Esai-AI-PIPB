@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { fileToBase64, processUploadedFiles, processClassFiles } from '../utils/fileUtils';
 import { gradeAnswer } from '../services/geminiService';
@@ -5,7 +6,6 @@ import { GradeResult, StudentSubmission } from '../types';
 import { UploadIcon, PaperclipIcon, DownloadIcon, XIcon, CheckIcon, ClipboardIcon } from './icons';
 import { extractTextFromOfficeFile } from '../utils/officeFileUtils';
 import { generateCsv, downloadCsv } from '../utils/csvUtils';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 // SAFETY TIMEOUT: 15 Menit. 
 const SAFETY_TIMEOUT_MS = 15 * 60 * 1000; 
@@ -64,9 +64,6 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     const [activeJobCancellers, setActiveJobCancellers] = useState<Record<string, () => void>>({});
     const abortBatchRef = useRef<boolean>(false);
 
-    // ReCAPTCHA V3 Hook
-    const { executeRecaptcha } = useGoogleReCaptcha();
-    
     const acceptedFileTypes = "image/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-zip-compressed";
     
     // Effect: Melaporkan "Dirty State" ke parent
@@ -393,11 +390,6 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             return;
         }
 
-        if (!executeRecaptcha) {
-            setError("ReCAPTCHA belum siap. Harap muat ulang halaman.");
-            return;
-        }
-
         setIsLoading(true);
         setError(null);
         setResults([]);
@@ -408,12 +400,6 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         setProgress({ current: 0, total: totalSteps, message: `Menginisialisasi antrian cerdas...` });
 
         try {
-            // EXECUTE RECAPTCHA V3
-            const token = await executeRecaptcha("grading_batch");
-            if (!token) {
-                throw new Error("Gagal verifikasi reCAPTCHA.");
-            }
-
             const lecturerAnswerPayload: { parts?: any[], text?: string } = {};
             if (answerKeyInputMethod === 'file') {
                  lecturerAnswerPayload.parts = await processFilesToParts(lecturerFiles);
@@ -485,7 +471,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             }
             setActiveJobCancellers({});
         }
-    }, [submissions, lecturerFiles, answerKeyInputMethod, lecturerAnswerText, gradeSubmission, keepLecturerAnswer, processFilesToParts, executeRecaptcha]);
+    }, [submissions, lecturerFiles, answerKeyInputMethod, lecturerAnswerText, gradeSubmission, keepLecturerAnswer, processFilesToParts]);
     
     const handleDownload = () => {
         const workbook = generateCsv(sortedResults);
@@ -736,13 +722,12 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                     ) : (
                         <>
                              <div className="mt-4 flex flex-col items-center">
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Dilindungi oleh reCAPTCHA</p>
                                 <button 
                                     onClick={handleSubmit} 
                                     disabled={submissions.length === 0 || isLecturerInputMissing} 
                                     className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all transform active:scale-[0.98] dark:disabled:from-gray-600 dark:disabled:to-gray-600"
                                 >
-                                    Mulai Penilaian AI untuk {submissions.length} Mahasiswa
+                                    {`Mulai Penilaian AI untuk ${submissions.length} Mahasiswa`}
                                 </button>
                             </div>
                         </>

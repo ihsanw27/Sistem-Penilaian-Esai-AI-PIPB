@@ -1,10 +1,10 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { fileToBase64, processUploadedFiles } from '../utils/fileUtils';
 import { gradeAnswer } from '../services/geminiService';
 import { GradeResult } from '../types';
 import { UploadIcon, CheckIcon, XIcon, PaperclipIcon, ClipboardIcon } from './icons';
 import { extractTextFromOfficeFile } from '../utils/officeFileUtils';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface SingleStudentGraderProps {
     /** Callback untuk memberi tahu parent (Dashboard) jika ada data aktif (file/hasil) */
@@ -50,9 +50,6 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
     
     // Manajemen Pembatalan
     const abortRef = useRef<boolean>(false);
-
-    // ReCAPTCHA V3 Hook
-    const { executeRecaptcha } = useGoogleReCaptcha();
 
     const acceptedFileTypes = "image/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-zip-compressed";
 
@@ -143,11 +140,6 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
             return;
         }
 
-        if (!executeRecaptcha) {
-            setError("ReCAPTCHA belum siap. Harap muat ulang halaman.");
-            return;
-        }
-
         setIsLoading(true);
         setError(null);
         setResult(null);
@@ -155,12 +147,6 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
         abortRef.current = false;
 
         try {
-            // EXECUTE RECAPTCHA V3
-            const token = await executeRecaptcha("grading_single");
-            if (!token) {
-                throw new Error("Gagal verifikasi reCAPTCHA.");
-            }
-
             // 1. Siapkan Kunci Jawaban (Konteks)
             const lecturerAnswerPayload: { parts?: any[], text?: string } = {};
             if (answerKeyInputMethod === 'file') {
@@ -401,7 +387,6 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                 ) : (
                     <>
                          <div className="mt-4 flex flex-col items-center">
-                            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Dilindungi oleh reCAPTCHA</p>
                             <button 
                                 onClick={handleGrade} 
                                 disabled={studentFiles.length === 0 || isLecturerInputMissing} 
