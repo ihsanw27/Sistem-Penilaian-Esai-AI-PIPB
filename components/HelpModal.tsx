@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { XIcon, UploadIcon, CheckIcon, DownloadIcon } from './icons';
 
@@ -202,7 +201,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                             <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah file kunci jawaban Dosen atau ketik manual pada kotak teks.
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Mulai Penilaian:</strong> Klik tombol "Mulai Penilaian AI". Tunggu proses analisis.
+                                            <strong className="text-gray-900 dark:text-gray-100">Mulai Penilaian:</strong> Selesaikan reCAPTCHA ("Saya bukan robot"), lalu klik tombol "Mulai Penilaian AI".
                                         </li>
                                         <li>
                                             <strong className="text-gray-900 dark:text-gray-100">Review Hasil:</strong> Periksa hasil analisis di panel kanan. Klik "Tampilkan Teks" untuk verifikasi OCR global.
@@ -246,7 +245,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                             <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah kunci jawaban Dosen (berlaku untuk seluruh kelas).
                                         </li>
                                         <li>
-                                            <strong className="text-gray-900 dark:text-gray-100">Eksekusi:</strong> Klik "Mulai Penilaian AI untuk X Mahasiswa".
+                                            <strong className="text-gray-900 dark:text-gray-100">Eksekusi:</strong> Selesaikan verifikasi reCAPTCHA, lalu klik "Mulai Penilaian AI untuk X Mahasiswa".
                                         </li>
                                         <li>
                                             <strong className="text-gray-900 dark:text-gray-100">Monitoring:</strong> Pantau progress bar. Sistem memproses 8 mahasiswa sekaligus (Optimized Concurrency). Jika macet >15 menit, Anda bisa klik (x) untuk skip manual.
@@ -303,6 +302,46 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                     <li>Utils: xlsx (Excel Export), jszip (Archive handling), mammoth (Word parsing)</li>
                                 </ul>
                             </div>
+
+                            <section>
+                                <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-3 border-b border-red-200 dark:border-red-900/50 pb-2">
+                                    🛡️ Security & Abuse Prevention
+                                </h3>
+                                <div className="space-y-4 text-gray-700 dark:text-gray-300 font-sans bg-red-50 dark:bg-red-900/10 p-4 rounded-lg">
+                                    <p className="font-bold">PENTING: Karena aplikasi ini berjalan di sisi klien (Client-Side), API Key Anda dapat terekspos jika tidak diamankan dengan benar.</p>
+                                    
+                                    <div>
+                                        <h4 className="font-bold text-base text-gray-900 dark:text-gray-100">1. Mengamankan API Key (Wajib Dilakukan di Google Console)</h4>
+                                        <p className="mt-1 text-xs">Untuk mencegah orang lain mencuri API Key Anda dan menghabiskan kuota billing:</p>
+                                        <ul className="list-decimal list-inside ml-4 text-xs mt-2 space-y-1">
+                                            <li>Buka <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="text-blue-600 underline">Google Cloud Console &gt; Credentials</a>.</li>
+                                            <li>Klik pada API Key yang digunakan aplikasi ini.</li>
+                                            <li>Pada bagian <strong>Application restrictions</strong>, pilih <strong>HTTP referrers (web sites)</strong>.</li>
+                                            <li>Tambahkan domain aplikasi Anda (misal: <code>https://penilaian-ai.politeknik.ac.id/*</code>).</li>
+                                            <li>Simpan. Sekarang, API Key hanya bisa digunakan dari website kampus Anda.</li>
+                                        </ul>
+                                    </div>
+
+                                    <div>
+                                        <h4 className="font-bold text-base text-gray-900 dark:text-gray-100">2. Proteksi Kode (Internal Safeguards)</h4>
+                                        <ul className="list-disc list-inside ml-4 text-xs mt-2 space-y-1">
+                                            <li><strong>File Size Limit:</strong> Kode membatasi upload maksimal 10MB per file untuk mencegah DoS/Browser Crash.</li>
+                                            <li><strong>Prompt Injection Defense:</strong> System Instruction (Prompt) telah diperbarui untuk mengabaikan teks jahat dalam dokumen siswa yang mencoba memanipulasi skor (misal: "Abaikan instruksi sebelumnya...").</li>
+                                            <li><strong>Token Cap:</strong> Teks input yang sangat panjang dipotong otomatis untuk mencegah Token Exhaustion.</li>
+                                            <li><strong>reCAPTCHA v3 (Invisible):</strong> Aplikasi menggunakan Google reCAPTCHA v3 untuk memverifikasi interaksi pengguna secara tak terlihat.</li>
+                                        </ul>
+                                    </div>
+
+                                     <div>
+                                        <h4 className="font-bold text-base text-gray-900 dark:text-gray-100">3. Environment Configuration</h4>
+                                        <p className="mt-1 text-xs">Pastikan environment variables berikut disetel pada saat build/deployment:</p>
+                                        <ul className="list-disc list-inside ml-4 text-xs mt-2 space-y-1 bg-gray-100 dark:bg-gray-800 p-2 rounded">
+                                            <li><code>API_KEY</code>: Kunci Google Gemini API Anda (dari Google AI Studio).</li>
+                                            <li><code>RECAPTCHA_SITE_KEY</code>: Site Key Google reCAPTCHA v3 Anda (dari Google Cloud Console).</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </section>
 
                             <section>
                                 <h3 className="text-lg font-bold text-purple-700 dark:text-purple-400 mb-3">

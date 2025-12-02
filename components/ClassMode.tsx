@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { fileToBase64, processUploadedFiles, processClassFiles } from '../utils/fileUtils';
 import { gradeAnswer } from '../services/geminiService';
@@ -6,6 +5,7 @@ import { GradeResult, StudentSubmission } from '../types';
 import { UploadIcon, PaperclipIcon, DownloadIcon, XIcon, CheckIcon, ClipboardIcon } from './icons';
 import { extractTextFromOfficeFile } from '../utils/officeFileUtils';
 import { generateCsv, downloadCsv } from '../utils/csvUtils';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 // SAFETY TIMEOUT: 15 Menit. 
 const SAFETY_TIMEOUT_MS = 15 * 60 * 1000; 
@@ -15,6 +15,10 @@ const SAFETY_TIMEOUT_MS = 15 * 60 * 1000;
 // Limit 8 adalah "Sweet Spot" untuk akun Free/Pay-as-you-go standar pada model Gemini 3 Pro.
 // Jika dinaikkan >10, risiko Error 429 (Rate Limit) meningkat drastis yang justru memperlambat total waktu.
 const CONCURRENCY_LIMIT = 8;
+
+// MAX FILE SIZE: 10MB
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 interface ClassModeProps {
     /** Callback untuk memberi tahu parent (Dashboard) jika ada data aktif (file/hasil) */
@@ -59,6 +63,9 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     // Manajemen Pembatalan (Cancellation)
     const [activeJobCancellers, setActiveJobCancellers] = useState<Record<string, () => void>>({});
     const abortBatchRef = useRef<boolean>(false);
+
+    // ReCAPTCHA V3 Hook
+    const { executeRecaptcha } = useGoogleReCaptcha();
     
     const acceptedFileTypes = "image/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-zip-compressed";
     
@@ -166,8 +173,20 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     
     // Handler input Mahasiswa (Mode Kelas)
     const handleStudentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        setError(null);
         const files = e.target.files;
         if (files) {
+            const rawFiles = Array.from(files) as File[];
+
+            // SECURITY CHECK: File Size
+            const oversizedFiles = rawFiles.filter(f => f.size > MAX_FILE_SIZE_BYTES);
+            if (oversizedFiles.length > 0) {
+                setError(`File terlalu besar: ${oversizedFiles.map(f => f.name).join(', ')}. Maksimal ${MAX_FILE_SIZE_MB}MB per file.`);
+                // Reset input
+                e.target.value = '';
+                return;
+            }
+
             // Bersihkan state lama sepenuhnya
             setSubmissions([]);
             setResults([]);
@@ -176,7 +195,6 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             setShowDuplicateWarning(false);
             setShowPreview(true); // Otomatis buka preview agar user sadar datanya
 
-            const rawFiles = Array.from(files) as File[];
             // Gunakan processClassFiles untuk mendukung grouping Folder ZIP
             const processedSubmissions = await processClassFiles(rawFiles);
             setSubmissions(processedSubmissions);
@@ -185,9 +203,19 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     
     // Handler input Dosen (Tetap Flatten, semua jadi satu referensi)
     const handleLecturerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        setError(null);
         const files = e.target.files;
         if (files) {
             const rawFiles = Array.from(files) as File[];
+
+             // SECURITY CHECK: File Size
+             const oversizedFiles = rawFiles.filter(f => f.size > MAX_FILE_SIZE_BYTES);
+             if (oversizedFiles.length > 0) {
+                 setError(`File kunci terlalu besar: ${oversizedFiles.map(f => f.name).join(', ')}. Maksimal ${MAX_FILE_SIZE_MB}MB per file.`);
+                 e.target.value = '';
+                 return;
+             }
+
             const processed = await processUploadedFiles(rawFiles);
             setLecturerFiles(processed);
         }
@@ -364,6 +392,12 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             setError("Harap unggah file jawaban mahasiswa dan berikan kunci jawaban dosen.");
             return;
         }
+
+        if (!executeRecaptcha) {
+            setError("ReCAPTCHA belum siap. Harap muat ulang halaman.");
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         setResults([]);
@@ -374,6 +408,12 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         setProgress({ current: 0, total: totalSteps, message: `Menginisialisasi antrian cerdas...` });
 
         try {
+            // EXECUTE RECAPTCHA V3
+            const token = await executeRecaptcha("grading_batch");
+            if (!token) {
+                throw new Error("Gagal verifikasi reCAPTCHA.");
+            }
+
             const lecturerAnswerPayload: { parts?: any[], text?: string } = {};
             if (answerKeyInputMethod === 'file') {
                  lecturerAnswerPayload.parts = await processFilesToParts(lecturerFiles);
@@ -445,7 +485,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             }
             setActiveJobCancellers({});
         }
-    }, [submissions, lecturerFiles, answerKeyInputMethod, lecturerAnswerText, gradeSubmission, keepLecturerAnswer, processFilesToParts]);
+    }, [submissions, lecturerFiles, answerKeyInputMethod, lecturerAnswerText, gradeSubmission, keepLecturerAnswer, processFilesToParts, executeRecaptcha]);
     
     const handleDownload = () => {
         const workbook = generateCsv(sortedResults);
@@ -488,7 +528,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                             <p className="text-blue-600 dark:text-blue-400 font-medium">Mode Kelas: Deteksi Otomatis ZIP.</p>
                                             <p>• Jika file satuan: 1 File = 1 Mahasiswa</p>
                                             <p>• Jika ZIP berisi folder: 1 Folder = 1 Mahasiswa (Isi folder digabung)</p>
-                                            <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP.</p>
+                                            <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP. Maks 10MB/file.</p>
                                         </div>
                                     </>
                                 ) : (
@@ -618,7 +658,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                                     </label>
                                                     <div className="mt-2 text-xs text-gray-400 dark:text-gray-500 space-y-1">
                                                         <p>Semua file (termasuk ZIP) akan digabung jadi satu referensi kunci.</p>
-                                                        <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP.</p>
+                                                        <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP. Maks 10MB/file.</p>
                                                     </div>
                                                 </>
                                             ) : (
@@ -694,13 +734,18 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                             Batalkan Proses
                         </button>
                     ) : (
-                        <button 
-                            onClick={handleStartCheck} 
-                            disabled={submissions.length === 0 || isLecturerInputMissing} 
-                            className="w-full mt-4 inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all transform active:scale-[0.98] dark:disabled:from-gray-600 dark:disabled:to-gray-600"
-                        >
-                             Mulai Penilaian AI untuk {submissions.length} Mahasiswa
-                        </button>
+                        <>
+                             <div className="mt-4 flex flex-col items-center">
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Dilindungi oleh reCAPTCHA</p>
+                                <button 
+                                    onClick={handleSubmit} 
+                                    disabled={submissions.length === 0 || isLecturerInputMissing} 
+                                    className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all transform active:scale-[0.98] dark:disabled:from-gray-600 dark:disabled:to-gray-600"
+                                >
+                                    Mulai Penilaian AI untuk {submissions.length} Mahasiswa
+                                </button>
+                            </div>
+                        </>
                     )}
                 </div>
 
