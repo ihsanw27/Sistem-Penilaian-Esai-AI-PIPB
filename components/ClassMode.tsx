@@ -1,22 +1,4 @@
 
-/**
- * @file ClassMode.tsx
- * @description Komponen Penilaian Batch (Mode Kelas).
- * Komponen ini menangani logika kompleks penilaian banyak file secara bersamaan (concurrently).
- * 
- * FITUR UTAMA:
- * - Worker Pool Concurrency: Menilai 5 file/submission sekaligus untuk mengoptimalkan throughput.
- * - Staggered Start: Peluncuran bertahap untuk mencegah error "Thundering Herd" pada API.
- * - Safety Timeout: Mencegah kemacetan tak terbatas pada satu file yang lambat.
- * - Folder-based Grouping: Mendukung pengelompokan file dalam ZIP berdasarkan folder (1 Folder = 1 Mahasiswa).
- * - Manifest Preview: Fitur untuk melihat daftar mahasiswa terdeteksi sebelum proses dimulai.
- * - Ekspor Multi-Sheet: Menghasilkan laporan Excel yang mendetail.
- * - Visualisasi: Histogram Distribusi Nilai dan Statistik Kelas.
- * 
- * @author System
- * @version 1.6.0
- */
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { fileToBase64, processUploadedFiles, processClassFiles } from '../utils/fileUtils';
 import { gradeAnswer } from '../services/geminiService';
@@ -27,6 +9,12 @@ import { generateCsv, downloadCsv } from '../utils/csvUtils';
 
 // SAFETY TIMEOUT: 15 Menit. 
 const SAFETY_TIMEOUT_MS = 15 * 60 * 1000; 
+
+// OPTIMIZED CONCURRENCY LIMIT
+// Karena arsitektur service sekarang Stateless (Isolated), kita bisa meningkatkan konkurensi.
+// Limit 8 adalah "Sweet Spot" untuk akun Free/Pay-as-you-go standar pada model Gemini 3 Pro.
+// Jika dinaikkan >10, risiko Error 429 (Rate Limit) meningkat drastis yang justru memperlambat total waktu.
+const CONCURRENCY_LIMIT = 8;
 
 interface ClassModeProps {
     /** Callback untuk memberi tahu parent (Dashboard) jika ada data aktif (file/hasil) */
@@ -148,15 +136,16 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     }, [results, sortConfig]);
 
     // Helper: Warna Nilai
+    // Aturan Warna: Hijau >= 80, Kuning 60-79, Merah < 60
     const getGradeColor = (grade: number) => {
-        if (grade >= 75) return 'text-green-600 dark:text-green-400';
-        if (grade >= 61) return 'text-yellow-600 dark:text-yellow-400';
+        if (grade >= 80) return 'text-green-600 dark:text-green-400';
+        if (grade >= 60) return 'text-yellow-600 dark:text-yellow-400';
         return 'text-red-600 dark:text-red-400';
     };
 
     const getBarColor = (binIndex: number) => {
         const startVal = binIndex * 10;
-        if (startVal >= 70) return 'bg-green-400 dark:bg-green-500';
+        if (startVal >= 80) return 'bg-green-400 dark:bg-green-500';
         if (startVal >= 60) return 'bg-yellow-400 dark:bg-yellow-500';
         return 'bg-red-400 dark:bg-red-500';
     };
@@ -381,7 +370,6 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         setActiveJobCancellers({});
         abortBatchRef.current = false;
         
-        const concurrencyLimit = 5;
         const totalSteps = submissions.length;
         setProgress({ current: 0, total: totalSteps, message: `Menginisialisasi antrian cerdas...` });
 
@@ -430,7 +418,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             };
 
             const workers = [];
-            for (let w = 0; w < concurrencyLimit; w++) {
+            for (let w = 0; w < CONCURRENCY_LIMIT; w++) {
                 workers.push(worker(w));
                 // Staggered start to prevent thundering herd
                 await sleep(800); 

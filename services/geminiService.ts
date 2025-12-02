@@ -211,7 +211,8 @@ Kembalikan HANYA dalam format JSON sesuai skema.
     
     // --- LOGIKA RETRY & BACKOFF ---
     const MAX_RETRIES = 5; 
-    const INITIAL_BACKOFF_MS = 3000; 
+    // Increased to 5000ms for robustness with higher concurrency
+    const INITIAL_BACKOFF_MS = 5000; 
     const MAX_JITTER_MS = 2000; 
 
     let currentDelay = INITIAL_BACKOFF_MS;

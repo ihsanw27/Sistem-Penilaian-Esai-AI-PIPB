@@ -251,11 +251,14 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
 
     /**
      * Menentukan kelas warna CSS untuk nilai berdasarkan nilainya.
+     * Aturan Warna:
+     * - Hijau: 80 - 100
+     * - Kuning: 60 - 79
+     * - Merah: 0 - 59
      */
     const getGradeColor = (grade: number) => {
-        if (grade >= 90) return 'text-green-600 dark:text-green-400';
-        if (grade >= 70) return 'text-yellow-600 dark:text-yellow-400';
-        if (grade >= 50) return 'text-orange-500 dark:text-orange-400';
+        if (grade >= 80) return 'text-green-600 dark:text-green-400';
+        if (grade >= 60) return 'text-yellow-600 dark:text-yellow-400';
         return 'text-red-600 dark:text-red-400';
     };
 
