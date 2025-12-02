@@ -109,6 +109,43 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                 </p>
                             </section>
 
+                            {/* Lingkungan Sistem & Performa */}
+                            <section>
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 border-b pb-2 dark:border-gray-700">
+                                    💻 Lingkungan Sistem & Performa
+                                </h3>
+                                <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-xl border border-gray-200 dark:border-gray-700 space-y-4">
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 dark:text-gray-100 text-sm mb-2">🌐 Di mana aplikasi berjalan? (Server vs Browser)</h4>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                            Aplikasi ini menggunakan arsitektur <strong>Hybrid</strong>:
+                                        </p>
+                                        <ul className="list-disc list-inside ml-2 text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
+                                            <li><strong>Browser Anda (Client-Side):</strong> Semua logika aplikasi, ekstraksi file ZIP, manajemen antrian, dan pembuatan file Excel laporan berjalan <strong>100% di dalam laptop/PC Anda</strong>. Data tidak disimpan di server perantara kami.</li>
+                                            <li><strong>Google Cloud (Server-Side):</strong> Proses "berpikir" (membaca tulisan/OCR dan penilaian) dilakukan dengan mengirim data terenkripsi langsung ke server Google (Gemini API), lalu hasilnya dikembalikan ke Anda.</li>
+                                        </ul>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                                        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-lg">📡</span>
+                                                <span className="font-bold text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wide">Internet</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Sangat Berpengaruh</p>
+                                            <p className="text-xs text-gray-500 mt-2 leading-relaxed">Kecepatan upload menentukan seberapa cepat file dikirim ke AI. Jika internet lambat, tahap "Mengirim..." akan terasa lama.</p>
+                                        </div>
+                                        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-lg">💻</span>
+                                                <span className="font-bold text-xs text-purple-600 dark:text-purple-400 uppercase tracking-wide">Spek Komputer (RAM/CPU)</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Berpengaruh</p>
+                                            <p className="text-xs text-gray-500 mt-2 leading-relaxed">RAM dan CPU digunakan untuk mengekstrak ZIP besar dan menampung data di browser. Komputer dengan RAM &lt;4GB mungkin terasa berat saat memproses >50 mahasiswa.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
                             {/* Bagaimana AI Bekerja */}
                             <section>
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
