@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { fileToBase64, processUploadedFiles } from '../utils/fileUtils';
 import { gradeAnswer } from '../services/geminiService';
 import { GradeResult } from '../types';
-import { UploadIcon, CheckIcon, XIcon, PaperclipIcon } from './icons';
+import { UploadIcon, CheckIcon, XIcon, PaperclipIcon, ClipboardIcon } from './icons';
 import { extractTextFromOfficeFile } from '../utils/officeFileUtils';
 
 interface SingleStudentGraderProps {
@@ -386,8 +386,9 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                                         <div className="flex justify-end gap-2 mt-2">
                                             <button
                                                 onClick={handlePasteFromClipboard}
-                                                className="px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/40 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60"
+                                                className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/40 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60"
                                             >
+                                                <ClipboardIcon className="w-4 h-4 mr-2" />
                                                 Tempel dari Clipboard
                                             </button>
                                             <button
@@ -441,7 +442,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                     <div className={`bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl border border-blue-200 dark:border-gray-700 shadow-md transition-all duration-500 ease-in-out w-full flex flex-col relative h-auto lg:absolute lg:inset-0 lg:overflow-y-auto custom-scrollbar overflow-hidden`}>
                         {/* Header Hasil Sticky */}
                         {(result || isLoading) && (
-                            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 py-3 px-4 border-b border-gray-100 dark:border-gray-700 z-10 flex justify-between items-center shadow-sm">
+                            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 py-3 pt-5 pb-3 px-4 -mt-4 border-b border-gray-100 dark:border-gray-700 z-10 flex justify-between items-center shadow-sm">
                                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                                     <span className="text-2xl">📝</span> Hasil Analisis AI
                                 </h3>

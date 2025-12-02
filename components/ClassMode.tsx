@@ -18,7 +18,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { fileToBase64, processUploadedFiles } from '../utils/fileUtils';
 import { gradeAnswer } from '../services/geminiService';
 import { GradeResult } from '../types';
-import { UploadIcon, PaperclipIcon, DownloadIcon, XIcon, CheckIcon } from './icons';
+import { UploadIcon, PaperclipIcon, DownloadIcon, XIcon, CheckIcon, ClipboardIcon } from './icons';
 import { extractTextFromOfficeFile } from '../utils/officeFileUtils';
 import { generateCsv, downloadCsv } from '../utils/csvUtils';
 
@@ -578,9 +578,10 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                         <div className="flex justify-end gap-2 mt-2">
                                             <button
                                                 onClick={handlePasteFromClipboard}
-                                                className="px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/40 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60"
+                                                className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/40 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60"
                                             >
-                                                Tempel
+                                                <ClipboardIcon className="w-4 h-4 mr-2" />
+                                                Tempel dari Clipboard
                                             </button>
                                             <button
                                                 onClick={() => setLecturerAnswerText('')}
@@ -632,20 +633,24 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                     <div className={`p-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl border border-blue-200 dark:border-gray-700 shadow-md flex flex-col transition-all duration-500 ease-in-out w-full relative h-auto lg:absolute lg:inset-0 lg:overflow-y-auto custom-scrollbar`}>
                         {/* Header Hasil */}
                         {(results.length > 0 || isLoading) && (
-                            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 py-3 -mx-4 px-4 border-b border-gray-100 dark:border-gray-700 z-10 flex justify-between items-center mb-4">
+                            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 py-3 pt-5 pb-3 -mx-4 px-4 -mt-4 border-b border-gray-100 dark:border-gray-700 z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-0">
                                 <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                                     <span className="text-2xl">📊</span> Rekapitulasi Nilai Kelas
                                 </h2>
-                                <div className="flex gap-2">
+                                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                                     {results.length > 0 && !isLoading && (
                                         <>
                                             <button 
                                                 onClick={handleResetAll}
-                                                className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                                className="inline-flex justify-center items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors w-full sm:w-auto"
                                             >
-                                                Mulai Baru
+                                                <UploadIcon className="h-4 w-4 mr-2" />
+                                                Mulai Penilaian Baru
                                             </button>
-                                            <button onClick={handleDownload} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-green-600 hover:bg-green-700 transition-colors">
+                                            <button 
+                                                onClick={handleDownload} 
+                                                className="inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-green-600 hover:bg-green-700 transition-colors w-full sm:w-auto"
+                                            >
                                                 <DownloadIcon className="h-4 w-4 mr-2" />
                                                 Unduh Laporan
                                             </button>
