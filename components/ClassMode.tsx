@@ -162,10 +162,15 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     };
 
     // Helper: Membersihkan nama file untuk tampilan (menghapus cache-busting suffix)
+    // dan mengganti underscore dengan slash untuk visualisasi path.
     const getDisplayFilename = (filename: string) => {
-        // Pola regex untuk menghapus _TIMESTAMP_RANDOM sebelum ekstensi
-        // Mencari: underscore + 13 digit + underscore + 6 alfanumerik + (opsional extension)
-        return filename.replace(/_\d{13}_[a-z0-9]{6}/, '');
+        // 1. Hapus cache buster (underscore + 13 digit + underscore + 6 alfanum)
+        // Pola regex: _\d{13}_[a-z0-9]{6}
+        let clean = filename.replace(/_\d{13}_[a-z0-9]{6}/, '');
+        
+        // 2. Ganti underscore sisa dengan slash agar terlihat seperti path folder
+        // Ini memberikan visualisasi hierarki yang lebih baik (misal: Folder/File.jpg)
+        return clean.replace(/_/g, '/');
     };
 
     // --- HANDLER PENANGANAN FILE ---
