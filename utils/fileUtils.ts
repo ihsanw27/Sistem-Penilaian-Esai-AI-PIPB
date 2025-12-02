@@ -1,4 +1,3 @@
-
 /**
  * @file fileUtils.ts
  * @description Utilitas inti untuk manajemen file, ekstraksi arsip (ZIP), dan deteksi tipe MIME.
@@ -126,6 +125,11 @@ interface FileWithRelPath {
  * Di sini, setiap file yang diekstrak diberi nama unik dengan Timestamp + Random Hash.
  * Ini MEMAKSA browser dan AI Service untuk memperlakukan setiap file sebagai objek baru yang unik,
  * mencegah data mahasiswa A terbaca sebagai mahasiswa B.
+ * 
+ * CATATAN KEAMANAN LOGIKA:
+ * Pengubahan nama file fisik di sini TIDAK MERUSAK logika pengelompokan folder (Grouping).
+ * Kita menyimpan 'path' (original) secara terpisah dari 'file' (fisik). 
+ * Logika grouping menggunakan 'path', sedangkan AI membaca 'file'.
  * 
  * @param {File} zipFile - File ZIP sumber.
  * @returns {Promise<FileWithRelPath[]>} Array file dengan metadata path.
