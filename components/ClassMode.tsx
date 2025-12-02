@@ -513,7 +513,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                             <p className="text-blue-600 dark:text-blue-400 font-medium">Mode Kelas: Deteksi Otomatis ZIP.</p>
                                             <p>• Jika file satuan: 1 File = 1 Mahasiswa</p>
                                             <p>• Jika ZIP berisi folder: 1 Folder = 1 Mahasiswa (Isi folder digabung)</p>
-                                            <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP. Maks 10MB/file.</p>
+                                            <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP. <span className="text-red-500 font-bold">Maks 10MB/file.</span></p>
                                         </div>
                                     </>
                                 ) : (
@@ -643,7 +643,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                                     </label>
                                                     <div className="mt-2 text-xs text-gray-400 dark:text-gray-500 space-y-1">
                                                         <p>Semua file (termasuk ZIP) akan digabung jadi satu referensi kunci.</p>
-                                                        <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP. Maks 10MB/file.</p>
+                                                        <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP. <span className="text-red-500 font-bold">Maks 10MB/file.</span></p>
                                                     </div>
                                                 </>
                                             ) : (
@@ -770,15 +770,14 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                      <AILoader 
                                         status="AI Sedang Bekerja (Mode Massal)" 
                                         subStatus="Mohon tunggu, sistem sedang menilai seluruh mahasiswa secara paralel..."
+                                        elapsedTime={elapsedTime}
                                     />
                                 </div>
-
+                                
+                                {/* Rest of loading UI... */}
                                 <div className="flex justify-between items-center mb-2 text-sm">
                                     <span className="text-blue-800 dark:text-blue-300 font-bold">{progress.message}</span>
                                     <div className="flex items-center gap-3">
-                                         <span className="flex items-center px-2 py-0.5 rounded text-xs font-mono bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700">
-                                            ⏱️ {elapsedTime}s
-                                        </span>
                                         <span className="text-blue-600 dark:text-blue-400 font-mono text-xs">{progress.current}/{progress.total}</span>
                                     </div>
                                 </div>

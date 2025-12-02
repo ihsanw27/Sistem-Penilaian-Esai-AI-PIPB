@@ -48,6 +48,8 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
     const [elapsedTime, setElapsedTime] = useState(0);
     // Toggle visibilitas teks OCR
     const [showOcr, setShowOcr] = useState(false);
+    // Toggle visibilitas daftar file (Preview)
+    const [showPreview, setShowPreview] = useState(false);
     
     // Manajemen Pembatalan
     const abortRef = useRef<boolean>(false);
@@ -90,6 +92,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
             const processed = await processUploadedFiles(files);
             setStudentFiles(processed);
             setResult(null); // Reset hasil jika file berubah
+            setShowPreview(true); // Otomatis buka preview agar user sadar apa yang diupload
         }
     };
 
@@ -145,6 +148,8 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
         setError(null);
         setResult(null);
         setShowOcr(false);
+        // Tutup preview saat mulai agar bersih
+        setShowPreview(false);
         abortRef.current = false;
 
         try {
@@ -224,6 +229,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
         }
         setError(null);
         setShowOcr(false);
+        setShowPreview(false);
     };
 
     const getGradeColor = (grade: number) => {
@@ -255,7 +261,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                                     <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 space-y-1">
                                         <p className="text-blue-600 dark:text-blue-400 font-medium">Mode Individu: Semua file digabung jadi 1 jawaban.</p>
                                         <p>ZIP akan diekstrak dan isinya digabung (Flatten).</p>
-                                        <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP. Maks 10MB/file.</p>
+                                        <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP. <span className="text-red-500 font-bold">Maks 10MB/file.</span></p>
                                     </div>
                                 </>
                             ) : (
@@ -278,6 +284,50 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                             )}
                         </div>
                     </div>
+
+                    {/* FITUR BARU: Pratinjau Daftar File (Konsisten dengan Mode Kelas) */}
+                    {studentFiles.length > 0 && (
+                        <div className="mt-3">
+                            <button
+                                onClick={() => setShowPreview(!showPreview)}
+                                className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                <span className="flex items-center gap-2">
+                                    👁️ {showPreview ? 'Sembunyikan' : 'Lihat'} Rincian {studentFiles.length} File
+                                </span>
+                                <span className={`transform transition-transform ${showPreview ? 'rotate-180' : ''}`}>▼</span>
+                            </button>
+                            
+                            {showPreview && (
+                                <div className="mt-2 p-0 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden shadow-inner max-h-60 overflow-y-auto custom-scrollbar animate-fade-in">
+                                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                                        <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0 z-10">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase w-8">No</th>
+                                                <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">Nama File</th>
+                                                <th className="px-3 py-2 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">Ukuran</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                            {studentFiles.map((f, i) => (
+                                                <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                                    <td className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-500 font-mono">{i + 1}</td>
+                                                    <td className="px-3 py-1.5 text-xs text-gray-800 dark:text-gray-300 font-medium truncate max-w-[200px]" title={f.name}>
+                                                        {f.name}
+                                                    </td>
+                                                    <td className="px-3 py-1.5 text-xs text-right text-gray-500 dark:text-gray-400">
+                                                        <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600">
+                                                            {(f.size / 1024).toFixed(0)} KB
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 border-b dark:border-gray-700 pb-2 mb-4 mt-8 flex items-center gap-2">
@@ -303,7 +353,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                                                 </label>
                                                 <div className="mt-2 text-xs text-gray-400 dark:text-gray-500 space-y-1">
                                                     <p>Semua file (termasuk ZIP) akan digabung jadi satu referensi kunci.</p>
-                                                    <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP. Maks 10MB/file.</p>
+                                                    <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP. <span className="text-red-500 font-bold">Maks 10MB/file.</span></p>
                                                 </div>
                                             </>
                                         ) : (
@@ -373,11 +423,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
 
                 {isLoading ? (
                     <>
-                        <div className="w-full text-center mb-2">
-                             <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-sm font-mono border border-blue-200 dark:border-blue-700">
-                                ⏱️ Waktu berjalan: {elapsedTime} detik
-                            </div>
-                        </div>
+                        {/* Timer removed here, now handled inside AILoader */}
                         <button
                             onClick={handleCancel}
                             className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all transform active:scale-[0.98]"
@@ -442,11 +488,12 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                          <div className="flex-grow flex flex-col items-center justify-center">
                             <AILoader 
                                 status="AI Sedang Berpikir..." 
-                                subStatus="Membaca dokumen, menganalisis jawaban, dan mencocokkan dengan kunci..." 
+                                subStatus="Membaca dokumen, menganalisis jawaban, dan mencocokkan dengan kunci..."
+                                elapsedTime={elapsedTime}
                             />
                         </div>
                     )}
-
+                    {/* Rest of the component code (Result display) remains unchanged... */}
                     {result && (
                         <div className="space-y-6">
                             {/* Transkripsi OCR Global */}

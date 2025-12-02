@@ -4,6 +4,7 @@ import React from 'react';
 interface AILoaderProps {
     status?: string;
     subStatus?: string;
+    elapsedTime?: number; // Optional prop to show timer
 }
 
 /**
@@ -13,7 +14,8 @@ interface AILoaderProps {
  */
 const AILoader: React.FC<AILoaderProps> = ({ 
     status = "AI Sedang Berpikir...", 
-    subStatus = "Menganalisis konteks dokumen dan menilai jawaban..." 
+    subStatus = "Menganalisis konteks dokumen dan menilai jawaban...",
+    elapsedTime
 }) => {
     return (
         <div className="flex flex-col items-center justify-center py-10 px-4 w-full">
@@ -41,18 +43,26 @@ const AILoader: React.FC<AILoaderProps> = ({
                     </svg>
                 </div>
 
-                {/* 5. Orbiting Particle (Now Clockwise) */}
+                {/* 5. Orbiting Particle (Clockwise) */}
                 <div className="absolute top-0 left-1/2 -ml-1 w-2 h-2 bg-purple-400 rounded-full shadow-[0_0_10px_rgba(168,85,247,0.8)] animate-[spin_4s_linear_infinite] origin-[50%_48px]"></div>
             </div>
 
             {/* Status Text */}
-            <div className="text-center space-y-2 max-w-sm animate-fade-in">
+            <div className="text-center space-y-3 max-w-sm animate-fade-in flex flex-col items-center">
                 <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-purple-600 dark:from-blue-300 dark:to-purple-300">
                     {status}
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
                     {subStatus}
                 </p>
+                
+                {/* Integrated Timer UI */}
+                {elapsedTime !== undefined && (
+                    <div className="mt-2 inline-flex items-center px-4 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 text-xs font-mono font-semibold border border-blue-100 dark:border-blue-800 shadow-sm animate-pulse">
+                        <span className="mr-2 text-lg">⏱️</span>
+                        Waktu berjalan: {elapsedTime} detik
+                    </div>
+                )}
             </div>
         </div>
     );

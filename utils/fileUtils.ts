@@ -1,3 +1,4 @@
+
 /**
  * @file fileUtils.ts
  * @description Utilitas inti untuk manajemen file, ekstraksi arsip (ZIP), dan deteksi tipe MIME.
@@ -9,6 +10,9 @@
 
 import JSZip from 'jszip';
 import { StudentSubmission } from '../types';
+
+// Hard limit for individual files (10MB)
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 /**
  * Mendapatkan tipe MIME yang valid berdasarkan ekstensi file.
@@ -45,6 +49,12 @@ const getMimeTypeFromFilename = (filename: string): string => {
  */
 export const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
+    // Sanity check before reading
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+        reject(new Error(`File '${file.name}' terlalu besar (>10MB).`));
+        return;
+    }
+
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
@@ -95,7 +105,13 @@ export const extractFilesFromZip = async (zipFile: File): Promise<File[]> => {
             const entry = fileEntry as any;
             if (!isValidZipEntry(relativePath, entry)) continue;
 
+            // Sanity Check for ZIP content
             const blob = await entry.async('blob');
+            if (blob.size > MAX_FILE_SIZE_BYTES) {
+                 console.warn(`File dalam ZIP '${relativePath}' terlalu besar (>10MB), dilewati.`);
+                 continue; // Skip file ini tapi jangan gagalkan seluruh ZIP
+            }
+
             // Ambil nama file saja, abaikan folder path
             const fileName = relativePath.split('/').pop() || relativePath;
             extractedFiles.push(createFileFromBlob(blob, fileName));
@@ -144,6 +160,12 @@ export const extractFilesFromZipWithPaths = async (zipFile: File): Promise<FileW
             if (!isValidZipEntry(relativePath, entry)) continue;
 
             const blob = await entry.async('blob');
+            
+            // ZIP Content Size Check
+            if (blob.size > MAX_FILE_SIZE_BYTES) {
+                console.warn(`File dalam ZIP '${relativePath}' terlalu besar (>10MB), dilewati.`);
+                continue;
+            }
             
             // UNIQUE NAMING STRATEGY (CACHE BUSTING)
             // Format: "Path_Filename_TIMESTAMP_RANDOM.ext"
@@ -198,6 +220,12 @@ export const processClassFiles = async (files: File[]): Promise<StudentSubmissio
     const submissions: Map<string, File[]> = new Map();
 
     for (const file of files) {
+        // Sanity Check for Main Uploads
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            console.warn(`File upload '${file.name}' terlalu besar (>10MB), dilewati.`);
+            continue;
+        }
+
         const isZip = file.name.toLowerCase().endsWith('.zip') || file.type.includes('zip');
         
         if (isZip) {
@@ -320,6 +348,12 @@ export const processUploadedFiles = async (files: File[]): Promise<File[]> => {
     const processedFiles: File[] = [];
 
     for (const file of files) {
+         // Sanity Check
+         if (file.size > MAX_FILE_SIZE_BYTES) {
+            console.warn(`File upload '${file.name}' terlalu besar (>10MB), dilewati.`);
+            continue;
+        }
+
         if (file.name.toLowerCase().endsWith('.zip') || file.type.includes('zip')) {
             try {
                 // Gunakan versi flat (tanpa path handling) untuk individu

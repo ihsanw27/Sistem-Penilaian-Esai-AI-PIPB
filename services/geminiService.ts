@@ -1,3 +1,4 @@
+
 /**
  * @file geminiService.ts
  * @description Layanan ini menangani semua interaksi dengan Google Gemini API.
@@ -39,12 +40,11 @@ type ContentPart = { text: string; } | { inlineData: { data: string; mimeType: s
  */
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// INITIAL BACKOFF: 2000ms (2 Detik).
-// Angka ini adalah keseimbangan (Sweet Spot).
-// - Jika terlalu rendah (misal 500ms): Risiko 429 tinggi saat retry cepat.
-// - Jika terlalu tinggi (misal 5000ms): Mode Individu terasa laggy jika terjadi hiccup pertama.
-// Mode Kelas tetap aman karena dilindungi oleh frontend staggering (jeda antar worker).
-const INITIAL_BACKOFF_MS = 2000;
+// INITIAL BACKOFF: 1000ms (1 Detik).
+// UPDATED (Optimized for Speed): Menurunkan dari 2000ms ke 1000ms.
+// Ini membuat retry pertama jauh lebih cepat, mengurangi persepsi "lambat" pada penilaian individu.
+// Untuk Mode Kelas, keamanan tetap terjaga lewat Frontend Staggering.
+const INITIAL_BACKOFF_MS = 1000;
 
 /**
  * Menilai jawaban siswa terhadap kunci jawaban dosen menggunakan Gemini API.
