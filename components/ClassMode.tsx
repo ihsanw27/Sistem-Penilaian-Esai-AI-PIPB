@@ -1,30 +1,30 @@
+
 /**
  * @file ClassMode.tsx
  * @description Komponen Penilaian Batch (Mode Kelas).
  * Komponen ini menangani logika kompleks penilaian banyak file secara bersamaan (concurrently).
  * 
  * FITUR UTAMA:
- * - Worker Pool Concurrency: Menilai 5 file sekaligus untuk mengoptimalkan throughput.
+ * - Worker Pool Concurrency: Menilai 5 file/submission sekaligus untuk mengoptimalkan throughput.
  * - Staggered Start: Peluncuran bertahap untuk mencegah error "Thundering Herd" pada API.
  * - Safety Timeout: Mencegah kemacetan tak terbatas pada satu file yang lambat.
+ * - Folder-based Grouping: Mendukung pengelompokan file dalam ZIP berdasarkan folder (1 Folder = 1 Mahasiswa).
  * - Ekspor Multi-Sheet: Menghasilkan laporan Excel yang mendetail.
  * - Visualisasi: Histogram Distribusi Nilai dan Statistik Kelas.
  * 
  * @author System
- * @version 1.3.0
+ * @version 1.4.0
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { fileToBase64, processUploadedFiles } from '../utils/fileUtils';
+import { fileToBase64, processUploadedFiles, processClassFiles } from '../utils/fileUtils';
 import { gradeAnswer } from '../services/geminiService';
-import { GradeResult } from '../types';
+import { GradeResult, StudentSubmission } from '../types';
 import { UploadIcon, PaperclipIcon, DownloadIcon, XIcon, CheckIcon, ClipboardIcon } from './icons';
 import { extractTextFromOfficeFile } from '../utils/officeFileUtils';
 import { generateCsv, downloadCsv } from '../utils/csvUtils';
 
 // SAFETY TIMEOUT: 15 Menit. 
-// Bertindak sebagai "hard stop" atau jaring pengaman. Jika satu file memakan waktu lebih dari ini,
-// promise akan di-reject sehingga worker dapat beralih ke file berikutnya.
 const SAFETY_TIMEOUT_MS = 15 * 60 * 1000; 
 
 interface ClassModeProps {
@@ -35,8 +35,10 @@ interface ClassModeProps {
 const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     // --- MANAJEMEN STATE ---
 
-    // Input File
-    const [studentFiles, setStudentFiles] = useState<File[]>([]);
+    // Input Data: Menggunakan 'submissions' (Nama + Array File) alih-alih file datar.
+    const [submissions, setSubmissions] = useState<StudentSubmission[]>([]);
+    
+    // Kunci Jawaban Dosen
     const [lecturerFiles, setLecturerFiles] = useState<File[]>([]);
     const [lecturerAnswerText, setLecturerAnswerText] = useState<string>('');
     const [answerKeyInputMethod, setAnswerKeyInputMethod] = useState<'file' | 'text'>('file');
@@ -54,7 +56,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     const [showOcr, setShowOcr] = useState(false);
     
     // Deteksi Duplikasi
-    const [duplicateFiles, setDuplicateFiles] = useState<string[]>([]);
+    const [duplicateNames, setDuplicateNames] = useState<string[]>([]);
     const [showDuplicateWarning, setShowDuplicateWarning] = useState<boolean>(false);
 
     // Konfigurasi Sorting Tabel
@@ -64,9 +66,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     });
 
     // Manajemen Pembatalan (Cancellation)
-    // Map fileName -> fungsi reject. Memungkinkan pembatalan manual job tertentu.
     const [activeJobCancellers, setActiveJobCancellers] = useState<Record<string, () => void>>({});
-    // Ref untuk memberi sinyal berhenti pada loop batch utama.
     const abortBatchRef = useRef<boolean>(false);
     
     const acceptedFileTypes = "image/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-zip-compressed";
@@ -74,11 +74,10 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     // Effect: Melaporkan "Dirty State" ke parent
     useEffect(() => {
         if (onDataDirty) {
-            // Komponen dianggap "kotor" jika ada file yang diunggah ATAU ada hasil.
-            const isDirty = studentFiles.length > 0 || results.length > 0;
+            const isDirty = submissions.length > 0 || results.length > 0;
             onDataDirty(isDirty);
         }
-    }, [studentFiles, results, onDataDirty]);
+    }, [submissions, results, onDataDirty]);
 
     // Effect: Logika Timer selama loading
     useEffect(() => {
@@ -93,8 +92,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     }, [isLoading]);
 
 
-    // Memo: Hitung Statistik (Tertinggi, Terendah, Rata-rata, Distribusi)
-    // Hanya mempertimbangkan hasil valid (bukan kegagalan/timeout).
+    // Memo: Hitung Statistik
     const stats = useMemo(() => {
         const validResults = results.filter(r => 
             !r.improvements?.includes("GAGAL") && 
@@ -110,7 +108,6 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         const lowest = Math.min(...grades);
         const average = grades.reduce((sum, grade) => sum + grade, 0) / grades.length;
         
-        // Logika Distribusi: Bucket per 10 poin (0-9, 10-19... 90-100)
         const distribution = Array(10).fill(0);
         grades.forEach(g => {
             const idx = Math.min(Math.floor(g / 10), 9);
@@ -128,7 +125,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         }));
     };
 
-    // Memo: Hasil yang difilter & disortir untuk tampilan
+    // Memo: Hasil yang difilter & disortir
     const sortedResults = useMemo(() => {
         const sorted = [...results].sort((a, b) => {
             const nameA = a.fileName || '';
@@ -147,14 +144,13 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         return sorted;
     }, [results, sortConfig]);
 
-    // Helper: Warna Nilai (Sistem Lampu Lalu Lintas)
+    // Helper: Warna Nilai
     const getGradeColor = (grade: number) => {
         if (grade >= 75) return 'text-green-600 dark:text-green-400';
         if (grade >= 61) return 'text-yellow-600 dark:text-yellow-400';
         return 'text-red-600 dark:text-red-400';
     };
 
-    // Helper: Warna Batang Grafik
     const getBarColor = (binIndex: number) => {
         const startVal = binIndex * 10;
         if (startVal >= 70) return 'bg-green-400 dark:bg-green-500';
@@ -164,19 +160,22 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
 
     // --- HANDLER PENANGANAN FILE ---
     
+    // Handler input Mahasiswa (Mode Kelas)
     const handleStudentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files) {
             const rawFiles = Array.from(files) as File[];
-            // Menangani pembongkaran ZIP secara mulus
-            const processed = await processUploadedFiles(rawFiles);
-            setStudentFiles(processed);
+            // Gunakan processClassFiles untuk mendukung grouping Folder ZIP
+            const processedSubmissions = await processClassFiles(rawFiles);
+            setSubmissions(processedSubmissions);
+            
             // Reset pemeriksaan duplikat
-            setDuplicateFiles([]);
+            setDuplicateNames([]);
             setShowDuplicateWarning(false);
         }
     };
     
+    // Handler input Dosen (Tetap Flatten, semua jadi satu referensi)
     const handleLecturerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files) {
@@ -203,7 +202,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     };
 
     /**
-     * Mengonversi file mentah menjadi bagian konten siap API (Base64 atau Teks).
+     * Mengonversi file mentah menjadi bagian konten siap API.
      */
     const processFilesToParts = useCallback(async (files: File[]) => {
         return Promise.all(
@@ -214,11 +213,9 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 ];
                 if (officeMimeTypes.includes(file.type)) {
-                    // Ekstrak teks dari dokumen Office secara langsung
                     const text = await extractTextFromOfficeFile(file).catch(() => `Error processing ${file.name}`);
                     return { text: `--- Start of file: ${file.name} ---\n${text}\n--- End of file: ${file.name} ---` };
                 } else {
-                    // Gunakan Base64 untuk gambar/PDF
                     const base64 = await fileToBase64(file);
                     return { inlineData: { data: base64, mimeType: file.type } };
                 }
@@ -228,16 +225,15 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
 
     // --- HANDLER KONTROL JOB ---
 
-    const handleManualSkip = (fileName: string) => {
-        const cancel = activeJobCancellers[fileName];
+    const handleManualSkip = (name: string) => {
+        const cancel = activeJobCancellers[name];
         if (typeof cancel === 'function') {
-            cancel(); // Reject promise spesifik untuk file ini
+            cancel(); 
         }
     };
     
     const handleCancelBatch = () => {
-        abortBatchRef.current = true; // Hentikan loop
-        // Reject semua yang aktif
+        abortBatchRef.current = true;
         Object.values(activeJobCancellers).forEach((cancelFunc) => {
             if (typeof cancelFunc === 'function') {
                 cancelFunc();
@@ -249,69 +245,60 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
 
     const handleResetAll = () => {
         setResults([]);
-        setStudentFiles([]);
+        setSubmissions([]);
         setError(null);
         setProgress({ current: 0, total: 0, message: '' });
     };
 
     /**
-     * LOGIKA PENILAIAN (SATU UNIT).
-     * Membungkus panggilan API dalam kondisi balapan (race condition) dengan Timeout dan Pemicu Batal Manual.
+     * LOGIKA PENILAIAN (SATU SUBMISSION).
+     * Submission bisa berisi 1 file atau banyak file (dari folder).
      */
-    const gradeSingleFile = useCallback(async (
-        file: File,
+    const gradeSubmission = useCallback(async (
+        submission: StudentSubmission,
         lecturerAnswerPayload: any
     ): Promise<GradeResult | null> => {
         const gradingPromise = async () => {
             try {
-                const studentFileParts = await processFilesToParts([file]);
+                // Proses semua file dalam submission ini menjadi parts
+                const studentFileParts = await processFilesToParts(submission.files);
                 const gradingResult = await gradeAnswer(studentFileParts, lecturerAnswerPayload);
                 
                 if (gradingResult) {
-                    return { ...gradingResult, fileName: file.name };
+                    return { ...gradingResult, fileName: submission.name };
                 }
                 return null;
             } catch (e) {
-                console.error(`Failed to grade ${file.name}:`, e);
+                console.error(`Failed to grade ${submission.name}:`, e);
                 throw e;
             }
         };
 
-        // Logika Pembatalan
         let cancel: () => void = () => {}; 
         const racePromise = new Promise<GradeResult | null>((_, reject) => {
             cancel = () => reject(new Error('Dibatalkan Manual atau Timeout'));
-            
-            // Safety Timeout
             const timer = setTimeout(() => {
                 reject(new Error('Timeout (Batas Waktu Habis)'));
             }, SAFETY_TIMEOUT_MS);
-
-            // Daftarkan pembatal
-            setActiveJobCancellers(prev => ({ ...prev, [file.name]: cancel }));
+            setActiveJobCancellers(prev => ({ ...prev, [submission.name]: cancel }));
         });
 
         try {
-            // Race: Hasil API vs Timeout/Batal
             const result = await Promise.race([gradingPromise(), racePromise]);
-            // Cleanup
             setActiveJobCancellers(prev => {
                 const newState = { ...prev };
-                delete newState[file.name];
+                delete newState[submission.name];
                 return newState;
             });
             return result;
         } catch (error: any) {
-            // Cleanup
             setActiveJobCancellers(prev => {
                 const newState = { ...prev };
-                delete newState[file.name];
+                delete newState[submission.name];
                 return newState;
             });
-
-            // Kembalikan hasil "Gagal" (Jangan crash worker)
             return {
-                fileName: file.name,
+                fileName: submission.name,
                 grade: 0,
                 detailedFeedback: [],
                 improvements: `GAGAL: ${error.message}. Silakan nilai file ini secara manual.`,
@@ -324,12 +311,12 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
      * Pemeriksaan Deteksi Duplikasi
      */
     const handleStartCheck = () => {
-        const fileNames = studentFiles.map(f => f.name);
-        const duplicates = fileNames.filter((item, index) => fileNames.indexOf(item) !== index);
+        const names = submissions.map(s => s.name);
+        const duplicates = names.filter((item, index) => names.indexOf(item) !== index);
         const uniqueDuplicates = [...new Set(duplicates)];
 
         if (uniqueDuplicates.length > 0) {
-            setDuplicateFiles(uniqueDuplicates);
+            setDuplicateNames(uniqueDuplicates);
             setShowDuplicateWarning(true);
         } else {
             handleSubmit();
@@ -338,12 +325,11 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
 
     /**
      * LOGIKA PEMROSESAN BATCH UTAMA
-     * Menggunakan pola "Worker Pool" dengan Staggered Starts.
      */
     const handleSubmit = useCallback(async () => {
         setShowDuplicateWarning(false);
         const isLecturerInputMissing = (answerKeyInputMethod === 'file' && lecturerFiles.length === 0) || (answerKeyInputMethod === 'text' && !lecturerAnswerText.trim());
-        if (studentFiles.length === 0 || isLecturerInputMissing) {
+        if (submissions.length === 0 || isLecturerInputMissing) {
             setError("Harap unggah file jawaban mahasiswa dan berikan kunci jawaban dosen.");
             return;
         }
@@ -353,10 +339,8 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         setActiveJobCancellers({});
         abortBatchRef.current = false;
         
-        // Konkurensi optimal untuk menyeimbangkan kecepatan vs batas tarif
         const concurrencyLimit = 5;
-
-        const totalSteps = studentFiles.length;
+        const totalSteps = submissions.length;
         setProgress({ current: 0, total: totalSteps, message: `Menginisialisasi antrian cerdas...` });
 
         try {
@@ -367,21 +351,17 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                 lecturerAnswerPayload.text = lecturerAnswerText;
             }
 
-            // --- IMPLEMENTASI WORKER POOL ---
-            // Indeks bersama memastikan worker mengambil file berikutnya secara atomik.
             let currentIndex = 0;
             const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
             const worker = async (workerId: number) => {
-                while (currentIndex < studentFiles.length) {
+                while (currentIndex < submissions.length) {
                     if (abortBatchRef.current) break;
 
-                    // Pengambilan indeks atomik
                     const i = currentIndex++;
-                    const file = studentFiles[i];
+                    const submission = submissions[i];
 
-                    // Proses Job
-                    const result = await gradeSingleFile(file, lecturerAnswerPayload);
+                    const result = await gradeSubmission(submission, lecturerAnswerPayload);
 
                     if (abortBatchRef.current) break;
 
@@ -389,36 +369,29 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                         setResults(prev => [...prev, result]);
                     }
 
-                    // Perbarui Progress UI
                     setProgress(prev => ({
                         ...prev,
                         current: Math.min(prev.current + 1, totalSteps),
                         message: `Menganalisis berkas... (${Math.min(prev.current + 1, totalSteps)}/${totalSteps})`
                     }));
 
-                    // Pendinginan antar-job (Jitter) agar bucket token API terisi kembali
-                    if (currentIndex < studentFiles.length) {
+                    if (currentIndex < submissions.length) {
                         await sleep(1000 + Math.random() * 2000);
                     }
                 }
             };
 
-            // Luncurkan worker dengan "Staggered Start" (delay 800ms)
-            // Ini mencegah memukul API dengan 5 request pada milidetik yang persis sama.
             const workers = [];
             for (let w = 0; w < concurrencyLimit; w++) {
                 workers.push(worker(w));
                 await sleep(800); 
             }
 
-            // Tunggu semua worker menguras antrian
             await Promise.all(workers);
             
             if (!abortBatchRef.current) {
                 setProgress(p => ({ ...p, current: p.total, message: 'Analisis Selesai' }));
-                
-                // Cleanup
-                setStudentFiles([]); 
+                setSubmissions([]); 
                 if (!keepLecturerAnswer) {
                     setLecturerFiles([]);
                     setLecturerAnswerText('');
@@ -435,42 +408,24 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             }
             setActiveJobCancellers({});
         }
-    }, [studentFiles, lecturerFiles, answerKeyInputMethod, lecturerAnswerText, gradeSingleFile, keepLecturerAnswer, processFilesToParts]);
+    }, [submissions, lecturerFiles, answerKeyInputMethod, lecturerAnswerText, gradeSubmission, keepLecturerAnswer, processFilesToParts]);
     
-    // --- EXPORT & UI HELPERS ---
-
     const handleDownload = () => {
         const workbook = generateCsv(sortedResults);
         downloadCsv(workbook, 'Hasil-Penilaian-Kelas-PIPB.xlsx');
     };
 
     const isLecturerInputMissing = (answerKeyInputMethod === 'file' && lecturerFiles.length === 0) || (answerKeyInputMethod === 'text' && !lecturerAnswerText.trim());
-
-    const activeFileNames = Object.keys(activeJobCancellers);
-    
+    const activeNames = Object.keys(activeJobCancellers);
     const maxDistribution = Math.max(...stats.distribution, 1);
 
-    // Komponen Ikon Sort
     const SortIcon = ({ active, direction }: { active: boolean; direction: 'asc' | 'desc' }) => {
         if (!active) {
-            return (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-300">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-                </svg>
-            );
+            return <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-300"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>;
         }
-        if (direction === 'asc') {
-            return (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-blue-500">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-                </svg>
-            );
-        }
-        return (
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-blue-500">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-        );
+        return direction === 'asc' 
+            ? <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-blue-500"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
+            : <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-blue-500"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>;
     };
 
     return (
@@ -485,7 +440,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Unggah Semua Jawaban Mahasiswa</label>
                         <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-blue-200 dark:border-blue-800 border-dashed rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors">
                             <div className="space-y-1 text-center">
-                                {studentFiles.length === 0 ? (
+                                {submissions.length === 0 ? (
                                     <>
                                         <UploadIcon className="mx-auto h-12 w-12 text-blue-400 dark:text-blue-500" />
                                         <label htmlFor="student-file-upload" className="relative cursor-pointer bg-white dark:bg-gray-700 rounded-md font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 px-2 pb-1">
@@ -493,22 +448,23 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                             <input id="student-file-upload" type="file" className="sr-only" onChange={handleStudentFileChange} accept={acceptedFileTypes} multiple />
                                         </label>
                                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                                            <p className="text-blue-600 dark:text-blue-400 font-medium">Mode Kelas: Satu File = Satu Mahasiswa.</p>
-                                            <p>Jika menggunakan ZIP, sistem akan mengekstrak dan menilainya sebagai file-file terpisah (Batch).</p>
+                                            <p className="text-blue-600 dark:text-blue-400 font-medium">Mode Kelas: Deteksi Otomatis ZIP.</p>
+                                            <p>• Jika file satuan: 1 File = 1 Mahasiswa</p>
+                                            <p>• Jika ZIP berisi folder: 1 Folder = 1 Mahasiswa (Isi folder digabung)</p>
                                             <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP.</p>
                                         </div>
                                     </>
                                 ) : (
                                     <div>
                                         <PaperclipIcon className="mx-auto h-12 w-12 text-blue-500" />
-                                        <p className="mt-2 text-sm font-medium text-green-600 dark:text-green-400">{studentFiles.length} berkas siap dinilai</p>
+                                        <p className="mt-2 text-sm font-medium text-green-600 dark:text-green-400">{submissions.length} Mahasiswa siap dinilai</p>
                                         <div className="flex justify-center items-center gap-3 mt-3">
                                             <label htmlFor="student-file-upload" className="cursor-pointer text-xs font-medium text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/40 px-3 py-1.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors">
                                                 Ganti
                                                 <input id="student-file-upload" type="file" className="sr-only" onChange={handleStudentFileChange} accept={acceptedFileTypes} multiple />
                                             </label>
                                             <button
-                                                onClick={() => setStudentFiles([])}
+                                                onClick={() => setSubmissions([])}
                                                 className="text-xs font-medium text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/40 px-3 py-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/60 transition-colors"
                                             >
                                                 Hapus Semua
@@ -524,6 +480,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                         <span className="text-xl">🔑</span> Langkah 2: Unggah Soal & Kunci Jawaban
                     </h2>
                     <div>
+                        {/* Lecturer Input Section (Identical to previous, just context kept for XML) */}
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Unggah Kunci Jawaban Dosen</label>
                          <div className="rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
                              <div className="flex border-b border-gray-300 dark:border-gray-600">
@@ -621,13 +578,14 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                     ) : (
                         <button 
                             onClick={handleStartCheck} 
-                            disabled={studentFiles.length === 0 || isLecturerInputMissing} 
+                            disabled={submissions.length === 0 || isLecturerInputMissing} 
                             className="w-full mt-4 inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all transform active:scale-[0.98] dark:disabled:from-gray-600 dark:disabled:to-gray-600"
                         >
-                             Mulai Penilaian AI untuk {studentFiles.length} Mahasiswa
+                             Mulai Penilaian AI untuk {submissions.length} Mahasiswa
                         </button>
                     )}
                 </div>
+
                 {/* --- PANEL HASIL (KANAN) --- */}
                  <div className="relative flex flex-col min-h-[500px] lg:min-h-0">
                     <div className={`p-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl border border-blue-200 dark:border-gray-700 shadow-md flex flex-col transition-all duration-500 ease-in-out w-full relative h-auto lg:absolute lg:inset-0 lg:overflow-y-auto custom-scrollbar`}>
@@ -674,11 +632,11 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                     <div className="bg-blue-600 dark:bg-blue-400 h-2.5 rounded-full transition-all duration-300 ease-linear shadow-[0_0_10px_rgba(37,99,235,0.5)]" style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}></div>
                                 </div>
                                 {/* Visualisasi File Aktif */}
-                                {activeFileNames.length > 0 && (
+                                {activeNames.length > 0 && (
                                     <div className="mt-2">
                                         <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mb-1">Sedang memproses (Klik X untuk lewati):</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {activeFileNames.map((name, idx) => (
+                                            {activeNames.map((name, idx) => (
                                                 <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-white dark:bg-blue-900 border border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-200 truncate animate-pulse shadow-sm">
                                                     <span className="truncate max-w-[150px]">{name}</span>
                                                     <button 
@@ -700,7 +658,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                 <p>
                                     ✅ Penilaian <strong>{results.length}</strong> mahasiswa selesai dalam <strong>{elapsedTime}</strong> detik.
                                     <br/>
-                                    <span className="text-xs text-blue-600 dark:text-blue-400 opacity-80">(Rata-rata {(elapsedTime / results.length).toFixed(1)} detik/file)</span>
+                                    <span className="text-xs text-blue-600 dark:text-blue-400 opacity-80">(Rata-rata {(elapsedTime / results.length).toFixed(1)} detik/mhs)</span>
                                 </p>
                             </div>
                         )}
@@ -774,7 +732,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                                 onClick={() => handleSort('fileName')}
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    Nama Berkas
+                                                    Nama Mahasiswa
                                                     <SortIcon active={sortConfig.key === 'fileName'} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
@@ -831,17 +789,17 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                             <div className="bg-yellow-100 dark:bg-yellow-900/30 p-2 rounded-full">
                                 <span className="text-2xl">⚠️</span>
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Duplikasi File Terdeteksi</h3>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Duplikasi Mahasiswa Terdeteksi</h3>
                         </div>
                         
                         <div className="mb-6">
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                                Sistem menemukan nama file yang sama dalam unggahan Anda. Jika dilanjutkan, hasil penilaian mungkin akan memiliki nama yang sama dan membingungkan.
+                                Sistem menemukan nama mahasiswa yang sama dalam unggahan Anda. Jika dilanjutkan, hasil penilaian mungkin akan memiliki nama yang sama dan membingungkan.
                             </p>
                             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg p-3 max-h-40 overflow-y-auto custom-scrollbar">
-                                <p className="text-xs font-bold text-yellow-800 dark:text-yellow-400 mb-1">File duplikat:</p>
+                                <p className="text-xs font-bold text-yellow-800 dark:text-yellow-400 mb-1">Nama Duplikat:</p>
                                 <ul className="list-disc list-inside text-xs text-gray-700 dark:text-gray-300 space-y-1">
-                                    {duplicateFiles.map((name, i) => (
+                                    {duplicateNames.map((name, i) => (
                                         <li key={i} className="truncate">{name}</li>
                                     ))}
                                 </ul>
@@ -866,7 +824,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                 </div>
             )}
 
-            {/* Modal Detail & Verifikasi OCR */}
+            {/* Modal Detail */}
             {selectedResult && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 shadow-2xl w-full h-full sm:h-[90vh] sm:rounded-xl sm:max-w-[95vw] xl:max-w-[90vw] flex flex-col overflow-hidden animate-scale-in transition-colors duration-200">

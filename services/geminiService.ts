@@ -44,7 +44,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * Mengimplementasikan loop retry yang kuat dengan Exponential Backoff dan Jitter untuk menangani
  * kesalahan HTTP 429 (Too Many Requests), yang umum terjadi saat pemrosesan batch dengan LLM.
  *
- * @param studentAnswerParts - Array bagian konten (Teks/Gambar/PDF) yang mewakili jawaban siswa.
+ * @param studentAnswerParts - Array bagian konten (Teks/Gambar/PDF). Jika submission siswa terdiri dari banyak file (misal folder ZIP), semuanya digabung di sini.
  * @param lecturerAnswer - Kunci referensi. Bisa berupa teks mentah atau file (gambar/PDF).
  * @returns Promise yang menghasilkan objek `GradeResult` terstruktur, atau `null` jika gagal setelah retry maksimal.
  */
@@ -200,10 +200,9 @@ Kembalikan HANYA dalam format JSON sesuai skema.
     };
     
     // --- LOGIKA RETRY & BACKOFF ---
-    // Dikonfigurasi untuk ketahanan terhadap rate limits (QuotaExceeded)
     const MAX_RETRIES = 5; 
-    const INITIAL_BACKOFF_MS = 3000; // Mulai dengan tunggu 3 detik (meningkat dari 2 detik)
-    const MAX_JITTER_MS = 2000; // Tambahkan hingga 2 detik keacakan
+    const INITIAL_BACKOFF_MS = 3000; 
+    const MAX_JITTER_MS = 2000; 
 
     let currentDelay = INITIAL_BACKOFF_MS;
 
@@ -211,39 +210,30 @@ Kembalikan HANYA dalam format JSON sesuai skema.
         try {
             const gradingResult: GenerateContentResponse = await ai.models.generateContent(requestPayload);
             const resultJson = JSON.parse(gradingResult.text);
-            return resultJson as GradeResult; // Sukses
+            return resultJson as GradeResult; 
         } catch (error: any) {
             const errorString = JSON.stringify(error) || error.toString();
             // Deteksi Rate Limit (429) atau Resource Exhausted
             const isRateLimitError = errorString.includes('429') || errorString.includes('RESOURCE_EXHAUSTED');
 
             if (isRateLimitError && attempt < MAX_RETRIES) {
-                // Terapkan Jitter untuk mencegah "Thundering Herd" (semua worker mencoba ulang di ms yang sama)
                 const jitter = Math.floor(Math.random() * MAX_JITTER_MS);
                 const delay = currentDelay + jitter;
                 
                 console.warn(`Rate limit hit (attempt ${attempt}/${MAX_RETRIES}). Retrying in ${delay}ms...`);
                 await sleep(delay);
-                
-                // Exponential backoff: Tingkatkan waktu tunggu untuk upaya berikutnya
                 currentDelay *= 1.5; 
             } else {
                 console.error(`Error in grading process (attempt ${attempt}/${MAX_RETRIES}):`, error);
-                return null; // Fatal error atau max retries tercapai
+                return null;
             }
         }
     }
     
-    return null; // Fallback
+    return null;
 };
 
-// --- FUNGSI PENDUKUNG UNTUK FITUR LAIN ---
-
-type ImagePart = { inlineData: { data: string; mimeType: string; } };
-/**
- * Menganalisis gambar dengan prompt teks menggunakan model multimodal.
- * Digunakan oleh komponen ImageAnalyzer.
- */
+// ... (other functions: analyzeImageWithPrompt, createChatSession, runComplexQuery, startTranscriptionSession)
 export const analyzeImageWithPrompt = async (imagePart: ImagePart, prompt: string): Promise<string> => {
     try {
         const model = 'gemini-3-pro-preview';
@@ -258,10 +248,7 @@ export const analyzeImageWithPrompt = async (imagePart: ImagePart, prompt: strin
     }
 };
 
-/**
- * Membuat dan mengembalikan sesi obrolan baru dengan Gemini API.
- * Digunakan oleh komponen ChatBot.
- */
+type ImagePart = { inlineData: { data: string; mimeType: string; } };
 export const createChatSession = (): Chat => {
     const model = 'gemini-3-pro-preview';
     return ai.chats.create({
@@ -272,10 +259,6 @@ export const createChatSession = (): Chat => {
     });
 };
 
-/**
- * Menjalankan kueri kompleks menggunakan model yang kuat.
- * Digunakan oleh komponen ThinkingMode.
- */
 export const runComplexQuery = async (prompt: string): Promise<string> => {
     try {
         const model = 'gemini-3-pro-preview';
@@ -297,10 +280,6 @@ interface TranscriptionCallbacks {
     onclose: () => void;
 }
 
-/**
- * Memulai sesi transkripsi real-time langsung dengan Gemini Live API.
- * Menggunakan model audio-native preview.
- */
 export const startTranscriptionSession = (callbacks: TranscriptionCallbacks) => {
     return ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',

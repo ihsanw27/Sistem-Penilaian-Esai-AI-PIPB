@@ -4,16 +4,15 @@
  * @description Menyediakan utilitas untuk operasi file, khususnya:
  * 1. Konversi Base64 untuk upload API.
  * 2. Ekstraksi ZIP (Unzipping) untuk upload batch/massal.
- * 3. Inferensi tipe MIME cerdas (memperbaiki masalah 'application/octet-stream').
+ * 3. Inferensi tipe MIME cerdas.
+ * 4. Logika pengelompokan file berdasarkan struktur folder ZIP.
  */
 
 import JSZip from 'jszip';
+import { StudentSubmission } from '../types';
 
 /**
  * Pembantu untuk menyimpulkan tipe mime dari ekstensi nama file.
- * Penting untuk file yang diekstrak dari ZIP di mana metadata tipe MIME sering hilang
- * atau default ke 'application/octet-stream', yang ditolak API.
- * 
  * @param filename - Nama file.
  * @returns String tipe MIME IANA yang sesuai.
  */
@@ -38,10 +37,8 @@ const getMimeTypeFromFilename = (filename: string): string => {
 
 /**
  * Mengonversi objek File ke string yang dikodekan base64.
- * Ini diperlukan untuk mengirim data gambar/PDF ke Gemini melalui field `inlineData`.
- * 
  * @param file - Objek File yang akan dikonversi.
- * @returns Promise yang diselesaikan dengan string base64 (tanpa prefix data URL).
+ * @returns Promise yang diselesaikan dengan string base64.
  */
 export const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -49,7 +46,6 @@ export const fileToBase64 = (file: File): Promise<string> => {
     reader.readAsDataURL(file);
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        // Kita menghapus prefix "data:image/png;base64," untuk mendapatkan raw bytes
         resolve(reader.result.split(',')[1]); 
       } else {
         reject(new Error('Failed to read file as base64 string.'));
@@ -60,12 +56,26 @@ export const fileToBase64 = (file: File): Promise<string> => {
 };
 
 /**
- * Mengekstrak file dari arsip ZIP secara rekursif (secara konseptual).
- * Fungsi ini mengabaikan direktori dan file sistem tersembunyi (seperti __MACOSX) untuk menjaga daftar tetap bersih.
- * Juga secara otomatis memperbaiki tipe MIME untuk file yang diekstrak.
- * 
- * @param zipFile - File .zip.
- * @returns Promise yang menyelesaikan ke array objek File yang diekstrak dari zip.
+ * Helper internal untuk membersihkan entri zip (membuang direktori sistem MacOS/Hidden).
+ */
+const isValidZipEntry = (relativePath: string, entry: any) => {
+    return !(entry.dir || relativePath.startsWith('__MACOSX') || relativePath.includes('/.') || relativePath.startsWith('.'));
+};
+
+/**
+ * Helper internal untuk memperbaiki tipe MIME.
+ */
+const createFileFromBlob = (blob: Blob, fileName: string) => {
+    let mimeType = blob.type;
+    if (!mimeType || mimeType === 'application/octet-stream') {
+        mimeType = getMimeTypeFromFilename(fileName);
+    }
+    return new File([blob], fileName, { type: mimeType });
+};
+
+/**
+ * Mengekstrak file dari ZIP. (Versi Datar/Flat).
+ * Digunakan oleh Mode Individu atau input Dosen (menggabungkan semua jadi satu konteks).
  */
 export const extractFilesFromZip = async (zipFile: File): Promise<File[]> => {
     try {
@@ -73,27 +83,12 @@ export const extractFilesFromZip = async (zipFile: File): Promise<File[]> => {
         const extractedFiles: File[] = [];
 
         for (const [relativePath, fileEntry] of Object.entries(zip.files)) {
-            // Cast ke any untuk menangani masalah inferensi tipe dengan JSZip
             const entry = fileEntry as any;
-            
-            // Lewati direktori dan file resource fork MacOS tersembunyi
-            if (entry.dir || relativePath.startsWith('__MACOSX') || relativePath.includes('/.') || relativePath.startsWith('.')) {
-                continue;
-            }
+            if (!isValidZipEntry(relativePath, entry)) continue;
 
             const blob = await entry.async('blob');
-            // Tangani folder bersarang dengan mengambil basename (hanya nama file)
             const fileName = relativePath.split('/').pop() || relativePath;
-            
-            // Perbaikan: Tentukan secara eksplisit tipe MIME dari ekstensi jika tipe blob generik
-            let mimeType = blob.type;
-            if (!mimeType || mimeType === 'application/octet-stream') {
-                mimeType = getMimeTypeFromFilename(fileName);
-            }
-            
-            // Buat objek File browser baru dengan tipe MIME yang benar
-            const file = new File([blob], fileName, { type: mimeType });
-            extractedFiles.push(file);
+            extractedFiles.push(createFileFromBlob(blob, fileName));
         }
         return extractedFiles;
     } catch (error) {
@@ -103,31 +98,126 @@ export const extractFilesFromZip = async (zipFile: File): Promise<File[]> => {
 };
 
 /**
- * Titik masuk utama untuk penanganan file di UI.
- * Memproses daftar file mentah yang diunggah. 
- * Jika menemukan ZIP, fungsi ini mengekstrak isinya dan meratakan (flatten) hasilnya ke dalam array utama.
+ * Struktur internal untuk menyimpan file dengan path relatifnya.
+ */
+interface FileWithRelPath {
+    file: File;
+    path: string;
+}
+
+/**
+ * Mengekstrak file dari ZIP namun mempertahankan informasi struktur folder.
+ * Digunakan untuk Mode Kelas agar bisa mendeteksi grouping.
+ */
+export const extractFilesFromZipWithPaths = async (zipFile: File): Promise<FileWithRelPath[]> => {
+    try {
+        const zip = await JSZip.loadAsync(zipFile);
+        const extracted: FileWithRelPath[] = [];
+
+        for (const [relativePath, fileEntry] of Object.entries(zip.files)) {
+            const entry = fileEntry as any;
+            if (!isValidZipEntry(relativePath, entry)) continue;
+
+            const blob = await entry.async('blob');
+            const fileName = relativePath.split('/').pop() || relativePath;
+            const file = createFileFromBlob(blob, fileName);
+            
+            extracted.push({ file, path: relativePath });
+        }
+        return extracted;
+    } catch (error) {
+         console.error("Error unzipping file with paths:", error);
+         throw new Error(`Gagal mengekstrak file ZIP: ${zipFile.name}`);
+    }
+};
+
+/**
+ * Memproses file upload untuk Mode Kelas dengan logika pengelompokan cerdas.
  * 
- * @param files - Array file dari elemen input HTML.
- * @returns Promise yang menyelesaikan ke array datar file yang diproses, siap untuk API.
+ * LOGIKA GROUPING:
+ * 1. Jika ZIP berisi folder (misal: "Ahmad/hal1.jpg"), maka "Ahmad" jadi Nama Mahasiswa.
+ * 2. Semua file dalam folder "Ahmad" digabung ke submission Ahmad.
+ * 3. File di root (misal: "Budi.pdf") dianggap submission individu.
+ * 
+ * @param files - File mentah dari input.
+ * @returns Promise array StudentSubmission.
+ */
+export const processClassFiles = async (files: File[]): Promise<StudentSubmission[]> => {
+    const submissions: Map<string, File[]> = new Map();
+
+    for (const file of files) {
+        const isZip = file.name.toLowerCase().endsWith('.zip') || file.type.includes('zip');
+        
+        if (isZip) {
+            try {
+                const entries = await extractFilesFromZipWithPaths(file);
+                for (const entry of entries) {
+                    const parts = entry.path.split('/');
+                    // Jika ada folder (parts > 1), gunakan nama folder pertama sebagai ID Mahasiswa
+                    // Jika di root, gunakan nama file (tanpa ekstensi) sebagai ID
+                    let studentName = "";
+                    
+                    if (parts.length > 1) {
+                        studentName = parts[0]; // Nama Folder
+                    } else {
+                        // File di root zip
+                        studentName = entry.file.name; 
+                    }
+
+                    if (!submissions.has(studentName)) {
+                        submissions.set(studentName, []);
+                    }
+                    submissions.get(studentName)?.push(entry.file);
+                }
+            } catch (e) {
+                console.warn(`Gagal ekstrak zip ${file.name}`, e);
+            }
+        } else {
+            // File reguler (bukan zip) yang diupload langsung
+            // Gunakan nama file sebagai ID Mahasiswa
+            const studentName = file.name;
+            
+            // Fix MIME type jika perlu
+            let processedFile = file;
+            if (!file.type || file.type === 'application/octet-stream') {
+                const fixedType = getMimeTypeFromFilename(file.name);
+                if (fixedType !== 'application/octet-stream') {
+                    processedFile = new File([file], file.name, { type: fixedType });
+                }
+            }
+
+            if (!submissions.has(studentName)) {
+                submissions.set(studentName, []);
+            }
+            submissions.get(studentName)?.push(processedFile);
+        }
+    }
+
+    // Konversi Map ke Array StudentSubmission
+    return Array.from(submissions.entries()).map(([name, files]) => ({
+        name,
+        files
+    }));
+};
+
+/**
+ * Logika standar untuk Mode Individu (Flatten semua jadi satu).
  */
 export const processUploadedFiles = async (files: File[]): Promise<File[]> => {
     const processedFiles: File[] = [];
 
     for (const file of files) {
-        if (file.name.toLowerCase().endsWith('.zip') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+        if (file.name.toLowerCase().endsWith('.zip') || file.type.includes('zip')) {
             try {
-                // Jika ZIP, ekstrak isi dan tambahkan ke daftar
                 const unzippedFiles = await extractFilesFromZip(file);
                 processedFiles.push(...unzippedFiles);
             } catch (e) {
                 console.warn(`Could not unzip ${file.name}, skipping.`, e);
             }
         } else {
-            // Tangani file reguler: periksa apakah kita perlu memperbaiki tipe MIME
             if (!file.type || file.type === 'application/octet-stream') {
                 const fixedType = getMimeTypeFromFilename(file.name);
                 if (fixedType !== 'application/octet-stream') {
-                    // Buat ulang file dengan tipe yang benar
                     processedFiles.push(new File([file], file.name, { type: fixedType }));
                     continue;
                 }

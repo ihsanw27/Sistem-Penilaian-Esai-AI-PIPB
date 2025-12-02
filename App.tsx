@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import GradingDashboard from './components/GradingDashboard';
-import { SunIcon, MoonIcon } from './components/icons';
+import { SunIcon, MoonIcon, QuestionMarkIcon } from './components/icons';
+import HelpModal from './components/HelpModal';
 
 /**
  * The main application component.
@@ -19,6 +21,9 @@ const App: React.FC = () => {
     }
     return false;
   });
+
+  // State for Help Modal
+  const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
 
   // Apply 'dark' class to html element
   useEffect(() => {
@@ -58,18 +63,27 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-sky-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 flex flex-col items-center p-4 sm:p-6 lg:p-8 transition-colors duration-200">
       <div className="w-full max-w-5xl mx-auto relative">
         
-        {/* Dark Mode Toggle - Absolute Top Right */}
-        <button
-          onClick={toggleTheme}
-          className="absolute top-0 right-0 p-2 rounded-full bg-white/50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-all shadow-sm z-50 backdrop-blur-sm"
-          title={isDark ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
-        >
-          {isDark ? (
-            <SunIcon className="w-6 h-6 text-yellow-400" />
-          ) : (
-            <MoonIcon className="w-6 h-6 text-slate-600" />
-          )}
-        </button>
+        {/* Top Right Controls (Dark Mode & Help) */}
+        <div className="absolute top-0 right-0 z-50 flex gap-2">
+            <button
+                onClick={() => setIsHelpOpen(true)}
+                className="p-2 rounded-full bg-white/50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-all shadow-sm backdrop-blur-sm group"
+                title="Bantuan & Dokumentasi"
+            >
+                <QuestionMarkIcon className="w-6 h-6 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
+            </button>
+            <button
+                onClick={toggleTheme}
+                className="p-2 rounded-full bg-white/50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-all shadow-sm backdrop-blur-sm"
+                title={isDark ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+            >
+                {isDark ? (
+                    <SunIcon className="w-6 h-6 text-yellow-400" />
+                ) : (
+                    <MoonIcon className="w-6 h-6 text-slate-600" />
+                )}
+            </button>
+        </div>
 
         <header className="text-center mb-8 pt-4">
           {/* Campus Logo */}
@@ -113,6 +127,9 @@ const App: React.FC = () => {
         <footer className="text-center mt-10 text-gray-400 dark:text-gray-500 text-sm pb-4">
           <p>&copy; {new Date().getFullYear()} Politeknik Industri Petrokimia Banten. Didukung oleh Google Gemini API.</p>
         </footer>
+
+        {/* Global Help Modal */}
+        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       </div>
     </div>
   );

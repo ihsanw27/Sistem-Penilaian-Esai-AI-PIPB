@@ -5,8 +5,28 @@
  * File ini berfungsi sebagai "Kontrak Data" antara komponen UI dan Layanan AI (Gemini).
  * 
  * @author System
- * @version 1.2.0
+ * @version 1.3.0
  */
+
+/**
+ * Merepresentasikan satu entitas pengumpulan jawaban mahasiswa.
+ * Dalam Mode Individu, ini biasanya 1 file gabungan.
+ * Dalam Mode Kelas, ini bisa berupa 1 file PDF, ATAU kumpulan file (gambar/hal) dari satu folder ZIP.
+ */
+export interface StudentSubmission {
+    /** 
+     * ID unik atau Nama Mahasiswa. 
+     * Jika dari Folder ZIP: Nama Folder (misal: "Ahmad Junaedi").
+     * Jika File Lepas: Nama File (misal: "Budi.pdf").
+     */
+    name: string;
+
+    /**
+     * Daftar file yang terkait dengan mahasiswa ini.
+     * AI akan membaca semua file ini sebagai satu kesatuan konteks jawaban.
+     */
+    files: File[];
+}
 
 /**
  * Merepresentasikan detail umpan balik untuk satu pertanyaan spesifik dalam jawaban siswa.
@@ -57,8 +77,8 @@ export interface FeedbackDetail {
  */
 export interface GradeResult {
     /** 
-     * Nama file yang dinilai.
-     * Identifier utama dalam Mode Kelas (Batch). Opsional dalam Mode Individu.
+     * Nama file atau Nama Mahasiswa yang dinilai.
+     * Identifier utama dalam Mode Kelas (Batch).
      */
     fileName?: string;
 

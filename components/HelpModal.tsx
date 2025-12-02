@@ -1,0 +1,241 @@
+
+import React, { useState } from 'react';
+import { XIcon, UploadIcon, CheckIcon, DownloadIcon } from './icons';
+
+interface HelpModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+/**
+ * @component HelpModal
+ * @description Modal komprehensif yang menampilkan panduan penggunaan aplikasi dan dokumentasi teknis.
+ * Memiliki dua tab: Pengguna (User Guide) dan Pengembang (Developer Docs).
+ */
+const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
+    const [activeTab, setActiveTab] = useState<'user' | 'dev'>('user');
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white dark:bg-gray-800 w-full max-w-4xl h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 animate-scale-in">
+                
+                {/* Header */}
+                <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                        <span className="text-2xl">📚</span> Pusat Bantuan & Dokumentasi
+                    </h2>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 transition-colors">
+                        <XIcon className="w-6 h-6" />
+                    </button>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex border-b border-gray-200 dark:border-gray-700">
+                    <button
+                        onClick={() => setActiveTab('user')}
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${
+                            activeTab === 'user'
+                                ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+                                : 'bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                    >
+                        Panduan Pengguna (Dosen)
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('dev')}
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${
+                            activeTab === 'dev'
+                                ? 'bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-b-2 border-purple-500'
+                                : 'bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                    >
+                        Dokumentasi Pengembang (IT)
+                    </button>
+                </div>
+
+                {/* Content Area */}
+                <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-white dark:bg-gray-800 custom-scrollbar">
+                    
+                    {/* --- TAB PENGGUNA --- */}
+                    {activeTab === 'user' && (
+                        <div className="space-y-8 max-w-3xl mx-auto">
+                            
+                            {/* Konsep Dasar */}
+                            <section>
+                                <h3 className="text-lg font-bold text-blue-800 dark:text-blue-300 mb-4 border-b pb-2 dark:border-gray-700">
+                                    🚀 Konsep Dasar
+                                </h3>
+                                <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+                                    Sistem ini menggunakan kecerdasan buatan (AI) untuk membaca tulisan tangan atau dokumen digital mahasiswa dan menilainya secara otomatis berdasarkan kunci jawaban yang Anda berikan. Sistem menjamin penilaian yang konsisten dan objektif.
+                                </p>
+                            </section>
+
+                            {/* Langkah-Langkah Mode Individu */}
+                            <section>
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                                    <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-sm px-2 py-1 rounded">Mode Individu</span>
+                                    <span>Langkah Penggunaan</span>
+                                </h3>
+                                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-700">
+                                    <ol className="list-decimal list-inside space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Pilih Mode:</strong> Klik tombol "Mode Individu" di halaman depan.
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Langkah 1 (Upload Jawaban):</strong> Unggah file jawaban milik <strong>satu mahasiswa</strong>. 
+                                            <ul className="pl-6 mt-1 list-disc text-gray-500 dark:text-gray-400 text-xs">
+                                                <li>Anda bisa mengunggah banyak file (misal: Halaman 1.jpg, Halaman 2.jpg).</li>
+                                                <li>Sistem akan menggabungkan semua file tersebut menjadi satu kesatuan jawaban.</li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah file kunci jawaban Dosen atau ketik manual pada kotak teks yang tersedia.
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Mulai Penilaian:</strong> Klik tombol "Mulai Penilaian AI". Tunggu beberapa saat hingga proses selesai.
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Review Hasil:</strong> Periksa hasil analisis di panel kanan (Skor, Koreksi Per Soal, dan Saran).
+                                        </li>
+                                    </ol>
+                                </div>
+                            </section>
+
+                             {/* Langkah-Langkah Mode Kelas */}
+                             <section>
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                                    <span className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-sm px-2 py-1 rounded">Mode Kelas</span>
+                                    <span>Langkah Penggunaan</span>
+                                </h3>
+                                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-700">
+                                    <ol className="list-decimal list-inside space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Pilih Mode:</strong> Klik tombol "Mode Kelas (Massal)".
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Langkah 1 (Upload Massal):</strong> Unggah file jawaban seluruh kelas.
+                                            <ul className="pl-6 mt-1 list-disc text-gray-500 dark:text-gray-400 text-xs">
+                                                <li><strong>File Lepas:</strong> Jika setiap mahasiswa mengumpulkan 1 file (misal: PDF), cukup blok semua file dan unggah.</li>
+                                                <li><strong>Folder ZIP:</strong> Jika satu mahasiswa mengumpulkan banyak halaman (foto), masukkan dalam folder bernama mahasiswa tersebut, lalu ZIP folder-folder tersebut.</li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah kunci jawaban Dosen (berlaku untuk seluruh kelas).
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Eksekusi:</strong> Klik "Mulai Penilaian AI untuk X Mahasiswa".
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Monitoring:</strong> Pantau progress bar. Jika ada file macet, klik tanda <strong>(x)</strong> untuk melewatinya.
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-900 dark:text-gray-100">Selesai:</strong> Unduh rekapitulasi nilai dan analisis detail dalam format Excel (.xlsx).
+                                        </li>
+                                    </ol>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 border-b pb-2 dark:border-gray-700">
+                                    📂 Format File yang Didukung
+                                </h3>
+                                <ul className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                                    <li className="flex items-start gap-2">
+                                        <CheckIcon className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                        <span><strong>Dokumen Digital:</strong> Word (.docx), Excel (.xlsx), PowerPoint (.pptx), PDF.</span>
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <CheckIcon className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                        <span><strong>Gambar / Scan:</strong> JPG, PNG, HEIC. (Pastikan tulisan terbaca jelas).</span>
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <CheckIcon className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                        <span><strong>Arsip:</strong> ZIP (Sangat disarankan untuk Mode Kelas).</span>
+                                    </li>
+                                </ul>
+                            </section>
+
+                            <section>
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 border-b pb-2 dark:border-gray-700">
+                                    💡 Tips & Trik
+                                </h3>
+                                <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400 list-disc list-inside">
+                                    <li><strong>Kunci Jawaban Teks Manual:</strong> Untuk soal esai pendek, mengetik kunci jawaban secara manual di kotak teks seringkali memberikan hasil lebih akurat daripada mengunggah file kunci yang rumit.</li>
+                                    <li><strong>Verifikasi OCR:</strong> Jika nilai terasa aneh, klik tombol "Tampilkan Teks" pada hasil penilaian untuk melihat apa yang sebenarnya dibaca oleh AI.</li>
+                                    <li><strong>Internet Stabil:</strong> Mode Kelas membutuhkan koneksi internet yang stabil karena mengirim banyak data secara paralel.</li>
+                                </ul>
+                            </section>
+                        </div>
+                    )}
+
+                    {/* --- TAB DEVELOPER --- */}
+                    {activeTab === 'dev' && (
+                        <div className="space-y-8 max-w-3xl mx-auto font-mono text-sm">
+                            <div className="p-4 bg-gray-900 text-green-400 rounded-lg border border-gray-700">
+                                <p className="mb-2">// Tech Stack</p>
+                                <ul className="list-none space-y-1 ml-4 text-gray-300">
+                                    <li>Frontend: React 19 + TypeScript</li>
+                                    <li>Styling: Tailwind CSS (Dark Mode supported)</li>
+                                    <li>AI SDK: @google/genai (Gemini 3 Pro Preview)</li>
+                                    <li>Utils: xlsx (Excel Export), jszip (Archive handling), mammoth (Word parsing)</li>
+                                </ul>
+                            </div>
+
+                            <section>
+                                <h3 className="text-lg font-bold text-purple-700 dark:text-purple-400 mb-3">
+                                    🏗️ Arsitektur Sistem
+                                </h3>
+                                <div className="space-y-4 text-gray-700 dark:text-gray-300 font-sans">
+                                    <div>
+                                        <h4 className="font-bold">1. Grading Logic (`services/geminiService.ts`)</h4>
+                                        <p>Menggunakan strategi <em>One-Shot Prompting</em> dengan instruksi sistem yang deterministik (Temperature 0). Menggunakan model <code>gemini-3-pro-preview</code> untuk kemampuan nalar dan OCR tertinggi. Skema JSON ketat digunakan untuk memastikan output terstruktur.</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold">2. Batch Processing (`components/ClassMode.tsx`)</h4>
+                                        <p>Menggunakan pola <strong>Worker Pool</strong> dengan konkurensi terbatas (default: 5 worker). Setiap worker mengambil job dari antrian secara asinkron. Terdapat mekanisme <em>Jitter/Staggered Start</em> untuk menghindari <em>Rate Limit (429)</em> API Google.</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold">3. File Handling (`utils/fileUtils.ts`)</h4>
+                                        <p>Mendukung ekstraksi teks murni dari file Office (DOCX/XLSX/PPTX) menggunakan library parser untuk akurasi 100%. Untuk gambar/PDF, dikonversi ke Base64 dan dikirim ke model multimodal.</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h3 className="text-lg font-bold text-purple-700 dark:text-purple-400 mb-3">
+                                    ⚠️ Catatan Maintenance
+                                </h3>
+                                <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 font-sans">
+                                    <li>
+                                        <strong>API Key:</strong> Pastikan <code>process.env.API_KEY</code> dikonfigurasi di environment deployment. Jangan hardcode di frontend.
+                                    </li>
+                                    <li>
+                                        <strong>Rate Limits:</strong> Jika sering terjadi error 429 pada deployment skala besar, pertimbangkan untuk menurunkan konkurensi di <code>ClassMode.tsx</code> atau menggunakan API Key tier berbayar.
+                                    </li>
+                                    <li>
+                                        <strong>Timeout:</strong> Sistem memiliki <em>Safety Net Timeout</em> 15 menit per file untuk mencegah hanging.
+                                    </li>
+                                </ul>
+                            </section>
+                        </div>
+                    )}
+
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm"
+                    >
+                        Tutup Panduan
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default HelpModal;
