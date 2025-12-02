@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { fileToBase64, processUploadedFiles } from '../utils/fileUtils';
 import { gradeAnswer } from '../services/geminiService';
@@ -283,8 +284,8 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                                             <p className="pl-1">atau seret ke sini</p>
                                         </div>
                                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                                            <p className="text-blue-600 dark:text-blue-400 font-medium">Mode Individu: Gabungkan File (Merge).</p>
-                                            <p>Semua file (termasuk isi ZIP) akan digabung jadi 1 jawaban mahasiswa.</p>
+                                            <p className="text-blue-600 dark:text-blue-400 font-medium">Mode Individu: ZIP Digabung (Merged).</p>
+                                            <p>Semua file (termasuk isi ZIP) akan dianggap sebagai 1 jawaban untuk 1 mahasiswa ini.</p>
                                             <p>Format didukung: PDF, Word, Excel, Foto (JPG/PNG), atau ZIP.</p>
                                         </div>
                                     </>

@@ -72,6 +72,39 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                 </p>
                             </section>
 
+                            {/* Bagian Baru: Bagaimana AI Bekerja */}
+                            <section>
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                                    <span className="text-xl">🧠</span> Bagaimana AI Bekerja?
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
+                                        <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2">1. Pra-pemrosesan File</h4>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                                            Sistem membaca file ZIP atau dokumen Office. Jika ada folder di dalam ZIP (Mode Kelas), sistem otomatis mengelompokkannya sebagai satu mahasiswa. Teks digital diekstrak langsung untuk akurasi 100%.
+                                        </p>
+                                    </div>
+                                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg border border-indigo-100 dark:border-indigo-800">
+                                        <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-2">2. OCR & Visi Komputer</h4>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                                            Untuk gambar tulisan tangan, model AI (Gemini 3 Pro) "melihat" gambar dan mengubahnya menjadi teks digital (OCR), mengenali pola tulisan yang sulit sekalipun.
+                                        </p>
+                                    </div>
+                                    <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800">
+                                        <h4 className="font-bold text-purple-800 dark:text-purple-300 mb-2">3. Pemahaman Konteks (NLP)</h4>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                                            AI membaca seluruh dokumen untuk menemukan jawaban yang relevan, meskipun urutan soal acak. Ia membandingkan makna jawaban siswa dengan kunci jawaban dosen secara semantik.
+                                        </p>
+                                    </div>
+                                    <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800">
+                                        <h4 className="font-bold text-green-800 dark:text-green-300 mb-2">4. Penilaian & Umpan Balik</h4>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                                            Skor diberikan berdasarkan kriteria dosen. AI menyusun umpan balik per soal dan saran perbaikan, lalu menyajikannya dalam tabel atau Excel.
+                                        </p>
+                                    </div>
+                                </div>
+                            </section>
+
                             {/* Langkah-Langkah Mode Individu */}
                             <section>
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
@@ -88,6 +121,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                             <ul className="pl-6 mt-1 list-disc text-gray-500 dark:text-gray-400 text-xs">
                                                 <li>Anda bisa mengunggah banyak file (misal: Halaman 1.jpg, Halaman 2.jpg).</li>
                                                 <li>Sistem akan menggabungkan semua file tersebut menjadi satu kesatuan jawaban.</li>
+                                                <li><strong>ZIP Handling:</strong> Jika Anda mengunggah ZIP, semua isinya diekstrak dan digabung menjadi milik 1 mahasiswa ini.</li>
                                             </ul>
                                         </li>
                                         <li>
@@ -116,10 +150,20 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                         </li>
                                         <li>
                                             <strong className="text-gray-900 dark:text-gray-100">Langkah 1 (Upload Massal):</strong> Unggah file jawaban seluruh kelas.
-                                            <ul className="pl-6 mt-1 list-disc text-gray-500 dark:text-gray-400 text-xs">
-                                                <li><strong>File Lepas:</strong> Jika setiap mahasiswa mengumpulkan 1 file (misal: PDF), cukup blok semua file dan unggah.</li>
-                                                <li><strong>Folder ZIP:</strong> Jika satu mahasiswa mengumpulkan banyak halaman (foto), masukkan dalam folder bernama mahasiswa tersebut, lalu ZIP folder-folder tersebut.</li>
-                                            </ul>
+                                            <div className="mt-2 ml-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
+                                                <strong className="block mb-1 text-yellow-800 dark:text-yellow-400">Strategi Upload ZIP (PENTING):</strong>
+                                                <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
+                                                    <li>
+                                                        <strong>Opsi A (Folder per Mahasiswa):</strong> Gunakan struktur folder. Buat folder "Ahmad", "Budi", dll. Masukkan file ke masing-masing folder. ZIP folder induknya. Sistem membaca nama folder sebagai nama mahasiswa.
+                                                    </li>
+                                                    <li>
+                                                        <strong>Opsi B (File Datar):</strong> Jika 1 mahasiswa = 1 File (misal PDF), blok semua file dan ZIP. Sistem otomatis menggunakan nama file (misal: "Budi.pdf" menjadi mahasiswa "Budi") dengan menghapus ekstensinya agar rapi.
+                                                    </li>
+                                                    <li>
+                                                        <strong>Opsi C (Campuran):</strong> Anda bisa mencampur folder dan file lepas dalam satu ZIP. Sistem akan mendeteksi keduanya secara otomatis.
+                                                    </li>
+                                                </ul>
+                                            </div>
                                         </li>
                                         <li>
                                             <strong className="text-gray-900 dark:text-gray-100">Langkah 2 (Upload Kunci):</strong> Unggah kunci jawaban Dosen (berlaku untuk seluruh kelas).
@@ -152,7 +196,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                     </li>
                                     <li className="flex items-start gap-2">
                                         <CheckIcon className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                                        <span><strong>Arsip:</strong> ZIP (Sangat disarankan untuk Mode Kelas).</span>
+                                        <span><strong>Arsip:</strong> ZIP (Sangat disarankan untuk Mode Kelas). Mendukung campuran file dan folder.</span>
                                     </li>
                                 </ul>
                             </section>
@@ -197,8 +241,13 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                         <p>Menggunakan pola <strong>Worker Pool</strong> dengan konkurensi terbatas (default: 5 worker). Setiap worker mengambil job dari antrian secara asinkron. Terdapat mekanisme <em>Jitter/Staggered Start</em> untuk menghindari <em>Rate Limit (429)</em> API Google.</p>
                                     </div>
                                     <div>
-                                        <h4 className="font-bold">3. File Handling (`utils/fileUtils.ts`)</h4>
-                                        <p>Mendukung ekstraksi teks murni dari file Office (DOCX/XLSX/PPTX) menggunakan library parser untuk akurasi 100%. Untuk gambar/PDF, dikonversi ke Base64 dan dikirim ke model multimodal.</p>
+                                        <h4 className="font-bold">3. File Handling & ZIP Heuristics (`utils/fileUtils.ts`)</h4>
+                                        <p>Sistem memiliki logika parser ZIP cerdas (<code>processClassFiles</code>). Ia memindai struktur path ZIP:</p>
+                                        <ul className="list-disc list-inside ml-4 text-xs mt-1">
+                                            <li><strong>Common Root Detection:</strong> Jika semua file ada dalam satu folder induk, folder itu diabaikan.</li>
+                                            <li><strong>Folder-based Grouping:</strong> Jika terdeteksi folder level-2 (misal "Budi/.."), file dikelompokkan sebagai <code>StudentSubmission</code> milik "Budi".</li>
+                                            <li><strong>Flat File Handling:</strong> Jika file berada di root (atau mixed), nama file digunakan sebagai nama siswa. Ekstensi file otomatis dihapus (misal: "Budi.pdf" -> "Budi") untuk konsistensi nama.</li>
+                                        </ul>
                                     </div>
                                 </div>
                             </section>
