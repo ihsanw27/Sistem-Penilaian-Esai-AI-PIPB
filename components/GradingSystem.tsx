@@ -443,7 +443,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                     <div className={`bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl border border-blue-200 dark:border-gray-700 shadow-md transition-all duration-500 ease-in-out w-full flex flex-col relative h-auto lg:absolute lg:inset-0 lg:overflow-y-auto custom-scrollbar overflow-hidden`}>
                         {/* Header Hasil Sticky */}
                         {(result || isLoading) && (
-                            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 py-3 pt-5 pb-3 px-4 -mt-4 border-b border-gray-100 dark:border-gray-700 z-10 flex justify-between items-center shadow-sm">
+                            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 py-3 pt-5 pb-3 px-4 border-b border-gray-100 dark:border-gray-700 z-10 flex justify-between items-center shadow-sm">
                                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                                     <span className="text-2xl">📝</span> Hasil Analisis AI
                                 </h3>
@@ -451,8 +451,9 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                                 {result && !isLoading && (
                                     <button 
                                         onClick={handleResetAll}
-                                        className="text-xs font-medium px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md text-gray-600 dark:text-gray-300 transition-colors"
+                                        className="inline-flex justify-center items-center px-3 py-1.5 text-xs font-medium rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-200 dark:border-gray-600"
                                     >
+                                        <UploadIcon className="h-3 w-3 mr-1.5" />
                                         Mulai Penilaian Baru
                                     </button>
                                 )}
@@ -525,55 +526,71 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
                                             Analisis Per Soal
                                         </h4>
                                         <div className="space-y-6">
-                                            {result.detailedFeedback.map((fb, index) => (
-                                                <div key={index} className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700 transition-colors duration-200 hover:border-blue-300 dark:hover:border-blue-500">
-                                                    <div className="flex justify-between items-start mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">
-                                                        <span className="font-black text-lg text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded">Soal #{fb.questionNumber}</span>
-                                                        <div className="text-right">
-                                                            <span className={`text-2xl font-bold ${getGradeColor(fb.score)}`}>{fb.score}</span>
-                                                            <span className="text-xs text-gray-400 dark:text-gray-500 font-medium block">Poin</span>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    {/* Display Question Text */}
-                                                    {fb.questionText && (
-                                                        <div className="mb-4">
-                                                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 block">Pertanyaan</span>
-                                                            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border-l-4 border-blue-400 dark:border-blue-600 text-sm text-blue-900 dark:text-blue-200 font-medium">
-                                                                {fb.questionText}
+                                            {result.detailedFeedback.map((fb, index) => {
+                                                const isEmptyAnswer = fb.studentAnswer?.includes('[TIDAK DIKERJAKAN]');
+                                                
+                                                return (
+                                                    <div key={index} className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700 transition-colors duration-200 hover:border-blue-300 dark:hover:border-blue-500">
+                                                        <div className="flex justify-between items-start mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">
+                                                            <span className="font-black text-lg text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded">Soal #{fb.questionNumber}</span>
+                                                            <div className="text-right">
+                                                                {isEmptyAnswer ? (
+                                                                    <span className="text-xs font-bold px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded uppercase tracking-wide">KOSONG</span>
+                                                                ) : (
+                                                                    <span className={`text-2xl font-bold ${getGradeColor(fb.score)}`}>{fb.score}</span>
+                                                                )}
+                                                                {!isEmptyAnswer && <span className="text-xs text-gray-400 dark:text-gray-500 font-medium block">Poin</span>}
                                                             </div>
                                                         </div>
-                                                    )}
-                                                    
-                                                    {/* Display Lecturer Answer Key */}
-                                                    {fb.lecturerAnswer && (
-                                                        <div className="mb-4">
-                                                            <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest mb-1 block">Standar Jawaban Dosen</span>
-                                                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border-l-4 border-green-400 dark:border-green-600 text-sm text-green-900 dark:text-green-200 italic">
-                                                                {fb.lecturerAnswer}
+                                                        
+                                                        {/* Display Question Text */}
+                                                        {fb.questionText && (
+                                                            <div className="mb-4">
+                                                                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 block">Pertanyaan</span>
+                                                                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border-l-4 border-blue-400 dark:border-blue-600 text-sm text-blue-900 dark:text-blue-200 font-medium">
+                                                                    {fb.questionText}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    )}
+                                                        )}
+                                                        
+                                                        {/* Display Lecturer Answer Key */}
+                                                        {fb.lecturerAnswer && (
+                                                            <div className="mb-4">
+                                                                <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest mb-1 block">Standar Jawaban Dosen</span>
+                                                                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border-l-4 border-green-400 dark:border-green-600 text-sm text-green-900 dark:text-green-200 italic">
+                                                                    {fb.lecturerAnswer}
+                                                                </div>
+                                                            </div>
+                                                        )}
 
-                                                    {/* Display Student Answer Text (OCR per Question) */}
-                                                    {fb.studentAnswer && (
-                                                        <div className="mb-4">
-                                                            <div className="flex justify-between items-center mb-1">
-                                                                <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Jawaban Mahasiswa (Terbaca)</span>
-                                                                <span className="text-[10px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Salinan Lengkap</span>
+                                                        {/* Display Student Answer Text (OCR per Question) */}
+                                                        {fb.studentAnswer && (
+                                                            <div className="mb-4">
+                                                                <div className="flex justify-between items-center mb-1">
+                                                                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Jawaban Mahasiswa (Terbaca)</span>
+                                                                    {!isEmptyAnswer && <span className="text-[10px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Salinan Lengkap</span>}
+                                                                </div>
+                                                                
+                                                                {isEmptyAnswer ? (
+                                                                    <div className="p-4 bg-gray-50 dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 italic text-sm">
+                                                                        <span>🚫</span>
+                                                                        <span>Tidak ada jawaban terdeteksi untuk soal ini.</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-3 rounded-lg shadow-inner">
+                                                                        <p className="text-sm text-gray-800 dark:text-gray-200 font-mono whitespace-pre-wrap leading-relaxed">{fb.studentAnswer}</p>
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-3 rounded-lg shadow-inner">
-                                                                <p className="text-sm text-gray-800 dark:text-gray-200 font-mono whitespace-pre-wrap leading-relaxed">{fb.studentAnswer}</p>
-                                                            </div>
+                                                        )}
+                                                        
+                                                        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                                                            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest mb-1 block">Analisis & Umpan Balik AI</span>
+                                                            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap text-sm leading-relaxed">{fb.feedback}</p>
                                                         </div>
-                                                    )}
-                                                    
-                                                    <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
-                                                        <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest mb-1 block">Analisis & Umpan Balik AI</span>
-                                                        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap text-sm leading-relaxed">{fb.feedback}</p>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                     

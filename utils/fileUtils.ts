@@ -1,20 +1,22 @@
 
 /**
  * @file fileUtils.ts
- * @description Menyediakan utilitas untuk operasi file, khususnya:
- * 1. Konversi Base64 untuk upload API.
- * 2. Ekstraksi ZIP (Unzipping) untuk upload batch/massal.
- * 3. Inferensi tipe MIME cerdas.
- * 4. Logika pengelompokan file berdasarkan struktur folder ZIP.
+ * @description Utilitas inti untuk manajemen file, ekstraksi arsip (ZIP), dan deteksi tipe MIME.
+ * File ini berisi logika "Smart Heuristic" untuk menentukan cara pengelompokan file mahasiswa
+ * dari struktur folder yang tidak terduga.
+ * 
+ * @module FileUtils
  */
 
 import JSZip from 'jszip';
 import { StudentSubmission } from '../types';
 
 /**
- * Pembantu untuk menyimpulkan tipe mime dari ekstensi nama file.
- * @param filename - Nama file.
- * @returns String tipe MIME IANA yang sesuai.
+ * Mendapatkan tipe MIME yang valid berdasarkan ekstensi file.
+ * Digunakan untuk memperbaiki file yang terdeteksi sebagai 'application/octet-stream'.
+ * 
+ * @param {string} filename - Nama file lengkap.
+ * @returns {string} Tipe MIME IANA standar.
  */
 const getMimeTypeFromFilename = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
@@ -36,9 +38,11 @@ const getMimeTypeFromFilename = (filename: string): string => {
 };
 
 /**
- * Mengonversi objek File ke string yang dikodekan base64.
- * @param file - Objek File yang akan dikonversi.
- * @returns Promise yang diselesaikan dengan string base64.
+ * Mengonversi objek File ke string Base64 murni (tanpa prefix data URI).
+ * Diperlukan untuk mengirim payload gambar/dokumen ke Gemini API.
+ * 
+ * @param {File} file - Objek File browser.
+ * @returns {Promise<string>} String Base64.
  */
 export const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -46,6 +50,7 @@ export const fileToBase64 = (file: File): Promise<string> => {
     reader.readAsDataURL(file);
     reader.onload = () => {
       if (typeof reader.result === 'string') {
+        // Hapus prefix "data:image/png;base64,"
         resolve(reader.result.split(',')[1]); 
       } else {
         reject(new Error('Failed to read file as base64 string.'));
@@ -56,17 +61,18 @@ export const fileToBase64 = (file: File): Promise<string> => {
 };
 
 /**
- * Helper internal untuk membersihkan entri zip (membuang direktori sistem MacOS/Hidden).
+ * Memvalidasi entri ZIP untuk mengabaikan file sampah sistem (macOS __MACOSX, hidden files).
  */
 const isValidZipEntry = (relativePath: string, entry: any) => {
     return !(entry.dir || relativePath.startsWith('__MACOSX') || relativePath.includes('/.') || relativePath.startsWith('.'));
 };
 
 /**
- * Helper internal untuk memperbaiki tipe MIME.
+ * Membuat objek File baru dari Blob dengan tipe MIME yang diperbaiki.
  */
 const createFileFromBlob = (blob: Blob, fileName: string) => {
     let mimeType = blob.type;
+    // Jika browser gagal mendeteksi atau memberikan octet-stream, coba deteksi dari ekstensi nama file
     if (!mimeType || mimeType === 'application/octet-stream') {
         mimeType = getMimeTypeFromFilename(fileName);
     }
@@ -74,8 +80,12 @@ const createFileFromBlob = (blob: Blob, fileName: string) => {
 };
 
 /**
- * Mengekstrak file dari ZIP. (Versi Datar/Flat).
- * Digunakan oleh Mode Individu atau input Dosen (menggabungkan semua jadi satu konteks).
+ * Mengekstrak file dari ZIP (Mode Datar/Flat).
+ * Semua struktur folder diabaikan, file dikumpulkan jadi satu list.
+ * Digunakan untuk: Mode Individu (Merging) atau Upload Kunci Dosen.
+ * 
+ * @param {File} zipFile - File ZIP sumber.
+ * @returns {Promise<File[]>} Array file yang diekstrak.
  */
 export const extractFilesFromZip = async (zipFile: File): Promise<File[]> => {
     try {
@@ -87,6 +97,7 @@ export const extractFilesFromZip = async (zipFile: File): Promise<File[]> => {
             if (!isValidZipEntry(relativePath, entry)) continue;
 
             const blob = await entry.async('blob');
+            // Ambil nama file saja, abaikan folder path
             const fileName = relativePath.split('/').pop() || relativePath;
             extractedFiles.push(createFileFromBlob(blob, fileName));
         }
@@ -98,7 +109,7 @@ export const extractFilesFromZip = async (zipFile: File): Promise<File[]> => {
 };
 
 /**
- * Struktur internal untuk menyimpan file dengan path relatifnya.
+ * Interface internal untuk menyimpan file beserta path aslinya di dalam ZIP.
  */
 interface FileWithRelPath {
     file: File;
@@ -106,8 +117,18 @@ interface FileWithRelPath {
 }
 
 /**
- * Mengekstrak file dari ZIP namun mempertahankan informasi struktur folder.
- * Digunakan untuk Mode Kelas agar bisa mendeteksi grouping.
+ * Mengekstrak file dari ZIP dengan mempertahankan path strukturnya.
+ * 
+ * CRITICAL DEEP FIX FOR OCR CONSISTENCY:
+ * Fungsi ini menerapkan "Nuclear Cache Busting".
+ * Browser sering melakukan caching pada Blob/File jika nama filenya sama (misal 'page1.jpg').
+ * 
+ * Di sini, setiap file yang diekstrak diberi nama unik dengan Timestamp + Random Hash.
+ * Ini MEMAKSA browser dan AI Service untuk memperlakukan setiap file sebagai objek baru yang unik,
+ * mencegah data mahasiswa A terbaca sebagai mahasiswa B.
+ * 
+ * @param {File} zipFile - File ZIP sumber.
+ * @returns {Promise<FileWithRelPath[]>} Array file dengan metadata path.
  */
 export const extractFilesFromZipWithPaths = async (zipFile: File): Promise<FileWithRelPath[]> => {
     try {
@@ -119,9 +140,32 @@ export const extractFilesFromZipWithPaths = async (zipFile: File): Promise<FileW
             if (!isValidZipEntry(relativePath, entry)) continue;
 
             const blob = await entry.async('blob');
-            const fileName = relativePath.split('/').pop() || relativePath;
-            const file = createFileFromBlob(blob, fileName);
             
+            // UNIQUE NAMING STRATEGY (CACHE BUSTING)
+            // Format: "Path_Filename_TIMESTAMP_RANDOM.ext"
+            // Mengganti slash '/' dengan underscore '_' dan menambah entropy SEBELUM ekstensi.
+            const timestamp = Date.now();
+            const randomSuffix = Math.random().toString(36).substring(2, 8);
+            
+            const sanitizedPath = relativePath.replace(/\//g, '_');
+            
+            // Sisipkan random string SEBELUM ekstensi agar MIME type tetap terbaca benar
+            const lastDotIndex = sanitizedPath.lastIndexOf('.');
+            let uniqueFileName;
+            
+            if (lastDotIndex !== -1) {
+                const namePart = sanitizedPath.substring(0, lastDotIndex);
+                const extPart = sanitizedPath.substring(lastDotIndex); // .jpg
+                uniqueFileName = `${namePart}_${timestamp}_${randomSuffix}${extPart}`;
+            } else {
+                uniqueFileName = `${sanitizedPath}_${timestamp}_${randomSuffix}`;
+            }
+            
+            // File fisik ini yang akan dikirim ke AI
+            // createFileFromBlob akan menggunakan ekstensi di akhir uniqueFileName untuk memperbaiki MIME type
+            const file = createFileFromBlob(blob, uniqueFileName);
+            
+            // Simpan path asli untuk keperluan grouping logika
             extracted.push({ file, path: relativePath });
         }
         return extracted;
@@ -132,18 +176,19 @@ export const extractFilesFromZipWithPaths = async (zipFile: File): Promise<FileW
 };
 
 /**
- * Memproses file upload untuk Mode Kelas dengan logika pengelompokan cerdas.
+ * Memproses file upload untuk Mode Kelas dengan logika pengelompokan DETERMINISTIK (v4.0).
  * 
- * ALGORITMA GROUPING (VERSION 2.1 - Mixed Content Support):
- * 1. **Ekstraksi**: Membaca ZIP beserta struktur direktorinya.
- * 2. **Deteksi Common Root**: Membuang folder induk jika semua file ada di dalamnya.
- * 3. **Grouping Hibrida**:
- *    - **Folder**: Jika file ada dalam sub-folder, nama folder = Nama Mahasiswa.
- *    - **File Datar**: Jika file ada di root, nama file (tanpa ekstensi) = Nama Mahasiswa.
- *    - Ini memungkinkan ZIP campuran (PDF lepas & Folder berisi Gambar) diproses bersamaan.
+ * LOGIKA DETEKSI BARU:
+ * 1. **Common Root Stripping**: Membuang folder induk jika semua file ada di dalamnya.
+ * 2. **Analisis Tipe ZIP**:
+ *    - Jika ZIP berisi campuran folder dan file, atau hanya dokumen (PDF/Doc) -> Mode Kelas Campuran.
+ *    - Jika ZIP HANYA berisi gambar di root level -> Mode Individu (1 Mahasiswa = 1 ZIP).
+ * 3. **Pengelompokan (Grouping)**:
+ *    - **Folder**: File dalam folder "Budi/" -> Mahasiswa "Budi".
+ *    - **File Root**: File "Ani.pdf" di root -> Mahasiswa "Ani" (ekstensi dibuang).
  * 
- * @param files - File mentah dari input (bisa campuran file lepas dan ZIP).
- * @returns Promise array StudentSubmission (Nama + Array File).
+ * @param {File[]} files - Array file mentah dari input elemen.
+ * @returns {Promise<StudentSubmission[]>} Data terstruktur siap nilai.
  */
 export const processClassFiles = async (files: File[]): Promise<StudentSubmission[]> => {
     const submissions: Map<string, File[]> = new Map();
@@ -154,14 +199,15 @@ export const processClassFiles = async (files: File[]): Promise<StudentSubmissio
         if (isZip) {
             try {
                 const entries = await extractFilesFromZipWithPaths(file);
+                if (entries.length === 0) continue;
                 
-                // --- LOGIKA COMMON ROOT DETECTION ---
+                // --- 1. Deteksi Common Root (Folder Induk) ---
                 const allPaths = entries.map(e => e.path.split('/'));
                 let commonDepth = 0;
                 
                 if (allPaths.length > 0) {
                     const minLength = Math.min(...allPaths.map(p => p.length));
-                    for (let i = 0; i < minLength - 1; i++) {
+                    for (let i = 0; i < minLength - 1; i++) { 
                         const first = allPaths[0][i];
                         const isCommon = allPaths.every(p => p[i] === first);
                         if (isCommon) {
@@ -171,41 +217,72 @@ export const processClassFiles = async (files: File[]): Promise<StudentSubmissio
                         }
                     }
                 }
-                // ------------------------------------
 
-                for (const entry of entries) {
-                    const parts = entry.path.split('/');
-                    const meaningfulParts = parts.slice(commonDepth);
+                // --- 2. Analisis Konten untuk Penentuan Mode ---
+                // Cek apakah ZIP ini kemungkinan besar adalah scan tugas 1 orang (isinya cuma gambar)
+                const rootLevelFolders = new Set<string>();
+                let hasOnlyImagesAtRoot = true;
+
+                entries.forEach(entry => {
+                    const parts = entry.path.split('/').slice(commonDepth);
                     
-                    let studentName = "";
-                    
-                    if (meaningfulParts.length > 1) {
-                        // KASUS 1: Struktur Folder (misal: "NamaSiswa/File.jpg")
-                        studentName = meaningfulParts[0]; 
+                    if (parts.length > 1) {
+                        // Ada folder
+                        rootLevelFolders.add(parts[0]);
+                        hasOnlyImagesAtRoot = false;
                     } else {
-                        // KASUS 2: File Datar (misal: "NamaSiswa.pdf")
-                        const fileName = meaningfulParts[0];
-                        // Hapus ekstensi file agar nama terlihat bersih (misal: "Budi.pdf" -> "Budi")
-                        // Ini membuatnya konsisten dengan nama yang berasal dari Folder.
-                        studentName = fileName.replace(/\.[^/.]+$/, "");
+                        // File di root
+                        const ext = parts[0].split('.').pop()?.toLowerCase();
+                        if (!['jpg','jpeg','png','webp','heic'].includes(ext || '')) {
+                            hasOnlyImagesAtRoot = false; // Ada PDF/Doc, berarti bukan sekadar kumpulan foto
+                        }
+                    }
+                });
+
+                // KASUS A: ZIP Individu (Hanya gambar, tidak ada folder lain)
+                // Contoh: Upload "Tugas_Budi.zip" isinya [hal1.jpg, hal2.jpg]
+                if (hasOnlyImagesAtRoot && rootLevelFolders.size === 0) {
+                    const zipStudentName = file.name.replace(/\.[^/.]+$/, ""); // Nama ZIP jadi Nama Mhs
+                    if (!submissions.has(zipStudentName)) {
+                        submissions.set(zipStudentName, []);
+                    }
+                    entries.forEach(e => submissions.get(zipStudentName)?.push(e.file));
+                    continue; // Lanjut ke file berikutnya
+                }
+
+                // KASUS B: ZIP Kelas (Campuran Folder / Dokumen)
+                // Contoh: "KelasA.zip" isinya [FolderBudi/, FolderAni/, Siti.pdf]
+                for (const entry of entries) {
+                    const parts = entry.path.split('/').slice(commonDepth);
+                    let studentName = "";
+
+                    if (parts.length > 1) {
+                        // STRATEGI FOLDER: Nama folder adalah nama mahasiswa
+                        // "Budi/halaman1.jpg" -> "Budi"
+                        studentName = parts[0]; 
+                    } else {
+                        // STRATEGI FILE: Nama file (tanpa ekstensi) adalah nama mahasiswa
+                        // "Siti Aminah.pdf" -> "Siti Aminah"
+                        studentName = parts[0].replace(/\.[^/.]+$/, "");
                     }
 
-                    // Fallback
-                    if (!studentName) studentName = entry.file.name;
+                    if (!studentName) continue;
 
                     if (!submissions.has(studentName)) {
                         submissions.set(studentName, []);
                     }
                     submissions.get(studentName)?.push(entry.file);
                 }
+
             } catch (e) {
                 console.warn(`Gagal ekstrak zip ${file.name}`, e);
             }
         } else {
-            // KASUS 3: Upload Massal Non-ZIP
-            // Gunakan nama file, hapus ekstensi untuk kebersihan
+            // KASUS NON-ZIP (Upload file biasa di Mode Kelas)
+            // Setiap file dianggap 1 mahasiswa
             const studentName = file.name.replace(/\.[^/.]+$/, "");
             
+            // Fix MIME type
             let processedFile = file;
             if (!file.type || file.type === 'application/octet-stream') {
                 const fixedType = getMimeTypeFromFilename(file.name);
@@ -221,6 +298,7 @@ export const processClassFiles = async (files: File[]): Promise<StudentSubmissio
         }
     }
 
+    // Konversi Map ke Array untuk output
     return Array.from(submissions.entries()).map(([name, files]) => ({
         name,
         files
@@ -229,6 +307,10 @@ export const processClassFiles = async (files: File[]): Promise<StudentSubmissio
 
 /**
  * Logika standar untuk Mode Individu (Flatten semua jadi satu).
+ * Menggabungkan semua file input (termasuk isi ZIP) menjadi satu array datar.
+ * 
+ * @param {File[]} files - File input.
+ * @returns {Promise<File[]>} Array file flat.
  */
 export const processUploadedFiles = async (files: File[]): Promise<File[]> => {
     const processedFiles: File[] = [];
@@ -236,6 +318,7 @@ export const processUploadedFiles = async (files: File[]): Promise<File[]> => {
     for (const file of files) {
         if (file.name.toLowerCase().endsWith('.zip') || file.type.includes('zip')) {
             try {
+                // Gunakan versi flat (tanpa path handling) untuk individu
                 const unzippedFiles = await extractFilesFromZip(file);
                 processedFiles.push(...unzippedFiles);
             } catch (e) {

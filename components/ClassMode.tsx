@@ -9,11 +9,12 @@
  * - Staggered Start: Peluncuran bertahap untuk mencegah error "Thundering Herd" pada API.
  * - Safety Timeout: Mencegah kemacetan tak terbatas pada satu file yang lambat.
  * - Folder-based Grouping: Mendukung pengelompokan file dalam ZIP berdasarkan folder (1 Folder = 1 Mahasiswa).
+ * - Manifest Preview: Fitur untuk melihat daftar mahasiswa terdeteksi sebelum proses dimulai.
  * - Ekspor Multi-Sheet: Menghasilkan laporan Excel yang mendetail.
  * - Visualisasi: Histogram Distribusi Nilai dan Statistik Kelas.
  * 
  * @author System
- * @version 1.4.0
+ * @version 1.5.0
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
@@ -54,6 +55,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     // Modal & UI State
     const [selectedResult, setSelectedResult] = useState<GradeResult | null>(null);
     const [showOcr, setShowOcr] = useState(false);
+    const [showPreview, setShowPreview] = useState<boolean>(false); // State untuk Manifest Preview
     
     // Deteksi Duplikasi
     const [duplicateNames, setDuplicateNames] = useState<string[]>([]);
@@ -164,14 +166,17 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
     const handleStudentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files) {
+            // Bersihkan state lama sepenuhnya
+            setSubmissions([]);
+            setResults([]);
+            setDuplicateNames([]);
+            setShowDuplicateWarning(false);
+            setShowPreview(true); // Otomatis buka preview agar user sadar datanya
+
             const rawFiles = Array.from(files) as File[];
             // Gunakan processClassFiles untuk mendukung grouping Folder ZIP
             const processedSubmissions = await processClassFiles(rawFiles);
             setSubmissions(processedSubmissions);
-            
-            // Reset pemeriksaan duplikat
-            setDuplicateNames([]);
-            setShowDuplicateWarning(false);
         }
     };
     
@@ -248,6 +253,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         setSubmissions([]);
         setError(null);
         setProgress({ current: 0, total: 0, message: '' });
+        setShowPreview(false);
     };
 
     /**
@@ -258,18 +264,24 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
         submission: StudentSubmission,
         lecturerAnswerPayload: any
     ): Promise<GradeResult | null> => {
+        // Critical: Pastikan kita menggunakan 'submission' yang diteruskan sebagai argumen,
+        // BUKAN variabel dari closure yang mungkin basi.
+        const currentSubmissionName = submission.name;
+
         const gradingPromise = async () => {
             try {
                 // Proses semua file dalam submission ini menjadi parts
+                // Fix: Pastikan file yang diproses benar-benar milik submission ini
                 const studentFileParts = await processFilesToParts(submission.files);
+                
                 const gradingResult = await gradeAnswer(studentFileParts, lecturerAnswerPayload);
                 
                 if (gradingResult) {
-                    return { ...gradingResult, fileName: submission.name };
+                    return { ...gradingResult, fileName: currentSubmissionName };
                 }
                 return null;
             } catch (e) {
-                console.error(`Failed to grade ${submission.name}:`, e);
+                console.error(`Failed to grade ${currentSubmissionName}:`, e);
                 throw e;
             }
         };
@@ -280,25 +292,25 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             const timer = setTimeout(() => {
                 reject(new Error('Timeout (Batas Waktu Habis)'));
             }, SAFETY_TIMEOUT_MS);
-            setActiveJobCancellers(prev => ({ ...prev, [submission.name]: cancel }));
+            setActiveJobCancellers(prev => ({ ...prev, [currentSubmissionName]: cancel }));
         });
 
         try {
             const result = await Promise.race([gradingPromise(), racePromise]);
             setActiveJobCancellers(prev => {
                 const newState = { ...prev };
-                delete newState[submission.name];
+                delete newState[currentSubmissionName];
                 return newState;
             });
             return result;
         } catch (error: any) {
             setActiveJobCancellers(prev => {
                 const newState = { ...prev };
-                delete newState[submission.name];
+                delete newState[currentSubmissionName];
                 return newState;
             });
             return {
-                fileName: submission.name,
+                fileName: currentSubmissionName,
                 grade: 0,
                 detailedFeedback: [],
                 improvements: `GAGAL: ${error.message}. Silakan nilai file ini secara manual.`,
@@ -328,6 +340,9 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
      */
     const handleSubmit = useCallback(async () => {
         setShowDuplicateWarning(false);
+        // Otomatis tutup preview saat mulai agar tampilan bersih
+        setShowPreview(false);
+        
         const isLecturerInputMissing = (answerKeyInputMethod === 'file' && lecturerFiles.length === 0) || (answerKeyInputMethod === 'text' && !lecturerAnswerText.trim());
         if (submissions.length === 0 || isLecturerInputMissing) {
             setError("Harap unggah file jawaban mahasiswa dan berikan kunci jawaban dosen.");
@@ -351,14 +366,19 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                 lecturerAnswerPayload.text = lecturerAnswerText;
             }
 
-            let currentIndex = 0;
+            // Menggunakan atomic counter (ref) untuk indeks, memastikan thread-safety dalam JS event loop
+            const indexRef = { current: 0 };
             const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
             const worker = async (workerId: number) => {
-                while (currentIndex < submissions.length) {
+                while (indexRef.current < submissions.length) {
                     if (abortBatchRef.current) break;
 
-                    const i = currentIndex++;
+                    // Atomic capture of index and increment
+                    const i = indexRef.current++;
+                    
+                    if (i >= submissions.length) break;
+
                     const submission = submissions[i];
 
                     const result = await gradeSubmission(submission, lecturerAnswerPayload);
@@ -375,7 +395,8 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                         message: `Menganalisis berkas... (${Math.min(prev.current + 1, totalSteps)}/${totalSteps})`
                     }));
 
-                    if (currentIndex < submissions.length) {
+                    // Random Jitter wait between jobs to prevent rate limit hammering
+                    if (indexRef.current < submissions.length) {
                         await sleep(1000 + Math.random() * 2000);
                     }
                 }
@@ -384,6 +405,7 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
             const workers = [];
             for (let w = 0; w < concurrencyLimit; w++) {
                 workers.push(worker(w));
+                // Staggered start to prevent thundering herd
                 await sleep(800); 
             }
 
@@ -474,13 +496,58 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                 )}
                             </div>
                         </div>
+
+                        {/* FITUR BARU: Pratinjau Manifest Data (Sanity Check) */}
+                        {submissions.length > 0 && (
+                            <div className="mt-3">
+                                <button
+                                    onClick={() => setShowPreview(!showPreview)}
+                                    className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        👁️ {showPreview ? 'Sembunyikan' : 'Lihat'} Daftar {submissions.length} Mahasiswa Terdeteksi
+                                    </span>
+                                    <span className={`transform transition-transform ${showPreview ? 'rotate-180' : ''}`}>▼</span>
+                                </button>
+                                
+                                {showPreview && (
+                                    <div className="mt-2 p-0 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden shadow-inner max-h-60 overflow-y-auto custom-scrollbar animate-fade-in">
+                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                                            <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0">
+                                                <tr>
+                                                    <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">No</th>
+                                                    <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">Nama Mahasiswa (ID)</th>
+                                                    <th className="px-3 py-2 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">Jml File</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                                {submissions.map((sub, i) => (
+                                                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                                        <td className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-500 font-mono">{i + 1}</td>
+                                                        <td className="px-3 py-1.5 text-xs text-gray-800 dark:text-gray-300 font-medium truncate max-w-[150px]" title={sub.name}>
+                                                            {sub.name}
+                                                        </td>
+                                                        <td className="px-3 py-1.5 text-xs text-right text-gray-500 dark:text-gray-400">
+                                                            {sub.files.length}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                        <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-[10px] text-yellow-800 dark:text-yellow-400 border-t border-yellow-100 dark:border-yellow-900/30 text-center">
+                                            💡 Pastikan nama mahasiswa sesuai dengan folder/file yang Anda unggah.
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                     
                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 border-b dark:border-gray-700 pb-2 mb-4 mt-8 flex items-center gap-2">
                         <span className="text-xl">🔑</span> Langkah 2: Unggah Soal & Kunci Jawaban
                     </h2>
                     <div>
-                        {/* Lecturer Input Section (Identical to previous, just context kept for XML) */}
+                        {/* Lecturer Input Section */}
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Unggah Kunci Jawaban Dosen</label>
                          <div className="rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
                              <div className="flex border-b border-gray-300 dark:border-gray-600">
@@ -894,51 +961,68 @@ const ClassMode: React.FC<ClassModeProps> = ({ onDataDirty }) => {
                                     Rincian Analisis Per Soal
                                 </h4>
                                 <div className="space-y-6">
-                                    {selectedResult.detailedFeedback.map((item, idx) => (
-                                        <div key={idx} className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200 hover:border-blue-300 dark:hover:border-blue-500">
-                                            <div className="flex justify-between items-start mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">
-                                                <span className="font-black text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded">Soal #{item.questionNumber}</span>
-                                                <span className={`text-xl font-bold ${getGradeColor(item.score)}`}>
-                                                    {item.score}/100
-                                                </span>
+                                    {selectedResult.detailedFeedback.map((item, idx) => {
+                                        const isEmptyAnswer = item.studentAnswer?.includes('[TIDAK DIKERJAKAN]');
+
+                                        return (
+                                            <div key={idx} className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200 hover:border-blue-300 dark:hover:border-blue-500">
+                                                <div className="flex justify-between items-start mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">
+                                                    <span className="font-black text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded">Soal #{item.questionNumber}</span>
+                                                    <div className="text-right">
+                                                        {isEmptyAnswer ? (
+                                                            <span className="text-xs font-bold px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded uppercase tracking-wide">KOSONG</span>
+                                                        ) : (
+                                                            <span className={`text-xl font-bold ${getGradeColor(item.score)}`}>
+                                                                {item.score}/100
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {item.questionText && (
+                                                    <div className="mb-4">
+                                                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 block">Pertanyaan</span>
+                                                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border-l-4 border-blue-400 dark:border-blue-600 text-sm text-blue-900 dark:text-blue-200 font-medium">
+                                                            {item.questionText}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {item.lecturerAnswer && (
+                                                    <div className="mb-4">
+                                                        <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest mb-1 block">Standar Jawaban Dosen</span>
+                                                        <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border-l-4 border-green-400 dark:border-green-600 text-sm text-green-900 dark:text-green-200 italic">
+                                                            {item.lecturerAnswer}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {item.studentAnswer && (
+                                                    <div className="mb-4">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Jawaban Mahasiswa (Terbaca)</span>
+                                                            {!isEmptyAnswer && <span className="text-[10px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Salinan Lengkap</span>}
+                                                        </div>
+                                                        {isEmptyAnswer ? (
+                                                            <div className="p-4 bg-gray-50 dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 italic text-sm">
+                                                                <span>🚫</span>
+                                                                <span>Tidak ada jawaban terdeteksi untuk soal ini.</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-3 rounded-lg shadow-inner">
+                                                                <p className="text-sm text-gray-800 dark:text-gray-200 font-mono whitespace-pre-wrap leading-relaxed">{item.studentAnswer}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                                                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest mb-1 block">Analisis & Umpan Balik AI</span>
+                                                    <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{item.feedback}</p>
+                                                </div>
                                             </div>
-
-                                            {item.questionText && (
-                                                <div className="mb-4">
-                                                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 block">Pertanyaan</span>
-                                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border-l-4 border-blue-400 dark:border-blue-600 text-sm text-blue-900 dark:text-blue-200 font-medium">
-                                                        {item.questionText}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {item.lecturerAnswer && (
-                                                <div className="mb-4">
-                                                    <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest mb-1 block">Standar Jawaban Dosen</span>
-                                                    <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border-l-4 border-green-400 dark:border-green-600 text-sm text-green-900 dark:text-green-200 italic">
-                                                        {item.lecturerAnswer}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                             {item.studentAnswer && (
-                                                <div className="mb-4">
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Jawaban Mahasiswa (Terbaca)</span>
-                                                        <span className="text-[10px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Salinan Lengkap</span>
-                                                    </div>
-                                                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-3 rounded-lg shadow-inner">
-                                                        <p className="text-sm text-gray-800 dark:text-gray-200 font-mono whitespace-pre-wrap leading-relaxed">{item.studentAnswer}</p>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
-                                                <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest mb-1 block">Analisis & Umpan Balik AI</span>
-                                                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{item.feedback}</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 

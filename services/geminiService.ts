@@ -5,6 +5,14 @@
  * Layanan ini mengenkapsulasi logika untuk rekayasa prompt (prompt engineering), konstruksi payload,
  * konfigurasi API, dan penanganan kesalahan yang kuat (retries/backoff).
  * 
+ * PEMBARUAN ROBUSTNESS:
+ * Layanan ini sekarang mendukung payload file yang telah di-uniquing (cache-busted) di sisi klien (fileUtils)
+ * untuk memastikan setiap permintaan batch diproses sebagai entitas unik, mengatasi masalah konsistensi OCR.
+ * 
+ * CRITICAL UPDATE (Stateless):
+ * Klien GoogleGenAI diinstansiasi ulang untuk setiap permintaan guna mencegah kebocoran state/konteks
+ * antar permintaan paralel.
+ * 
  * @dependencies @google/genai
  */
 
@@ -17,10 +25,6 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("API_KEY environment variable not set");
 }
-
-// Inisialisasi klien GoogleGenAI dengan kunci API.
-// Instance ini digunakan untuk semua panggilan berikutnya.
-const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 // Definisi tipe untuk bagian konten yang dapat dikirim ke Gemini API.
 // Bisa berupa teks sederhana atau data biner inline (gambar/PDF) yang dikodekan dalam Base64.
@@ -40,9 +44,9 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * Fungsi ini menggunakan strategi "One-Shot Prompting" dengan Instruksi Sistem yang sangat spesifik.
  * Dirancang untuk menjadi deterministik (temperature = 0) guna memastikan konsistensi penilaian.
  * 
- * STRATEGI RETRY (PENGULANGAN):
- * Mengimplementasikan loop retry yang kuat dengan Exponential Backoff dan Jitter untuk menangani
- * kesalahan HTTP 429 (Too Many Requests), yang umum terjadi saat pemrosesan batch dengan LLM.
+ * ISOLASI STATE:
+ * Klien AI dibuat di dalam scope fungsi ini. Ini menjamin tidak ada cache internal SDK yang terbawa
+ * dari penilaian mahasiswa sebelumnya.
  *
  * @param studentAnswerParts - Array bagian konten (Teks/Gambar/PDF). Jika submission siswa terdiri dari banyak file (misal folder ZIP), semuanya digabung di sini.
  * @param lecturerAnswer - Kunci referensi. Bisa berupa teks mentah atau file (gambar/PDF).
@@ -52,15 +56,14 @@ export const gradeAnswer = async (
     studentAnswerParts: ContentPart[],
     lecturerAnswer: { parts?: ContentPart[]; text?: string }
 ): Promise<GradeResult | null> => {
+    // STATELESS INSTANTIATION: Mencegah data bleeding antar request
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+
     // UPGRADE KUALITAS: Menggunakan 'gemini-3-pro-preview' karena menawarkan kemampuan penalaran superior
     // untuk tugas OCR kompleks dan pemetaan konteks dibandingkan model Flash.
     const gradingModel = 'gemini-3-pro-preview';
 
     // REKAYASA PROMPT (PROMPT ENGINEERING):
-    // Instruksi ini adalah "Otak" dari penilai. Menegakkan aturan ketat:
-    // 1. Determinisme: Nilai harus konsisten.
-    // 2. Pemindaian Non-Linear: Siswa mungkin menulis Jawaban #5 sebelum Jawaban #1.
-    // 3. Ekstraksi Verbatim: AI harus mengutip siswa persis untuk verifikasi, ringkasan dilarang.
     const gradingInstruction = `
 Anda adalah **Mesin Penilai Deterministik**. Peran Anda adalah untuk mengevaluasi jawaban siswa dengan objektivitas mekanis dan ketelitian absolut. Tujuan utama Anda adalah **konsistensi penilaian dan transparansi penuh**.
 
@@ -84,6 +87,12 @@ Skor yang Anda hasilkan untuk jawaban yang sama harus identik setiap saat. Varia
 -   **DILARANG** menggunakan referensi silang seperti "[Lihat teks lengkap di atas]", "[Jawaban panjang, lihat studentText]", atau sejenisnya.
 -   Anda WAJIB menyalin kata per kata (verbatim) apa yang ditulis siswa untuk soal tersebut, tidak peduli seberapa panjang jawabannya.
 -   Jika jawaban siswa 5 paragraf, salin ke-5 paragraf tersebut ke dalam 'studentAnswer'.
+
+**PENANGANAN JAWABAN KOSONG / TIDAK DITEMUKAN (CRITICAL):**
+-   Jika setelah memindai seluruh dokumen Anda **TIDAK MENEMUKAN** jawaban yang relevan untuk soal tertentu (siswa melewatkan soal atau mengosongkannya):
+    1.  Isi field 'studentAnswer' dengan teks tepat (tanpa tanda kutip): **"[TIDAK DIKERJAKAN]"**.
+    2.  Berikan skor **0**.
+    3.  Berikan feedback: "Jawaban tidak ditemukan dalam dokumen."
 
 **LARANGAN KERAS TERHADAP SUBJEKTIVITAS:**
 Anda dilarang keras menggunakan penilaian subjektif atau 'perasaan'. Setiap poin yang diberikan atau dikurangi **HARUS** dapat ditelusuri kembali secara langsung ke sebuah frasa, konsep, atau kata kunci spesifik dalam **Kunci Jawaban Dosen**.
@@ -128,6 +137,7 @@ Anda dilarang keras menggunakan penilaian subjektif atau 'perasaan'. Setiap poin
 
 INGAT: Cari jawaban siswa di mana saja dalam dokumen, jangan terpaku urutan halaman.
 INGAT: 'studentAnswer' per soal harus VERBATIM dan LENGKAP.
+INGAT: Jika kosong, gunakan "[TIDAK DIKERJAKAN]".
 
 Kembalikan HANYA dalam format JSON sesuai skema.
 `;
@@ -175,7 +185,7 @@ Kembalikan HANYA dalam format JSON sesuai skema.
                                 },
                                 studentAnswer: {
                                     type: Type.STRING,
-                                    description: "SALINAN LENGKAP DAN PERSIS (VERBATIM) dari jawaban siswa yang relevan untuk soal ini (dicari dari seluruh dokumen). JANGAN MENYINGKAT."
+                                    description: "SALINAN LENGKAP DAN PERSIS (VERBATIM) dari jawaban siswa. Gunakan '[TIDAK DIKERJAKAN]' jika kosong."
                                 },
                                 score: {
                                     type: Type.INTEGER,
@@ -233,9 +243,12 @@ Kembalikan HANYA dalam format JSON sesuai skema.
     return null;
 };
 
-// ... (other functions: analyzeImageWithPrompt, createChatSession, runComplexQuery, startTranscriptionSession)
+// ... (other functions)
+
+type ImagePart = { inlineData: { data: string; mimeType: string; } };
 export const analyzeImageWithPrompt = async (imagePart: ImagePart, prompt: string): Promise<string> => {
     try {
+        const ai = new GoogleGenAI({ apiKey: API_KEY });
         const model = 'gemini-3-pro-preview';
         const response = await ai.models.generateContent({
             model,
@@ -248,8 +261,8 @@ export const analyzeImageWithPrompt = async (imagePart: ImagePart, prompt: strin
     }
 };
 
-type ImagePart = { inlineData: { data: string; mimeType: string; } };
 export const createChatSession = (): Chat => {
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
     const model = 'gemini-3-pro-preview';
     return ai.chats.create({
         model,
@@ -261,6 +274,7 @@ export const createChatSession = (): Chat => {
 
 export const runComplexQuery = async (prompt: string): Promise<string> => {
     try {
+        const ai = new GoogleGenAI({ apiKey: API_KEY });
         const model = 'gemini-3-pro-preview';
         const response = await ai.models.generateContent({
             model,
@@ -281,6 +295,7 @@ interface TranscriptionCallbacks {
 }
 
 export const startTranscriptionSession = (callbacks: TranscriptionCallbacks) => {
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
     return ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks,
