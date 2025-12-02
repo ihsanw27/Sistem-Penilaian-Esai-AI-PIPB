@@ -1,11 +1,11 @@
-
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { XIcon, UploadIcon, CheckIcon, DownloadIcon } from './icons';
+import { XIcon, UploadIcon, CheckIcon, DownloadIcon, SettingsIcon } from './icons';
 
 interface HelpModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onOpenSettings?: () => void; // Prop baru untuk membuka pengaturan dari help
 }
 
 /**
@@ -13,7 +13,7 @@ interface HelpModalProps {
  * @description Modal komprehensif yang menampilkan panduan penggunaan aplikasi dan dokumentasi teknis.
  * Menggunakan React Portal untuk rendering di top-level document body.
  */
-const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
+const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onOpenSettings }) => {
     const [activeTab, setActiveTab] = useState<'user' | 'dev'>('user');
 
     if (!isOpen) return null;
@@ -102,8 +102,41 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                     🚀 Konsep Dasar
                                 </h3>
                                 <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed text-justify">
-                                    Sistem Penilaian Esai AI PIPB adalah platform cerdas yang dirancang untuk membantu dosen Politeknik Industri Petrokimia Banten dalam menilai jawaban mahasiswa secara objektif, cepat, dan transparan. Menggunakan model <strong>Gemini 3 Pro Preview</strong>, sistem ini mampu membaca berbagai format dokumen (PDF, Word, Gambar, Tulis Tangan) dan membandingkannya dengan kunci jawaban Dosen secara verbatim (kata per kata).
+                                    Sistem Penilaian Esai AI PIPB adalah platform cerdas yang dirancang untuk membantu dosen Politeknik Industri Petrokimia Banten dalam menilai jawaban mahasiswa secara objektif, cepat, dan transparan. Menggunakan model <strong>Google Gemini</strong>, sistem ini mampu membaca berbagai format dokumen (PDF, Word, Gambar, Tulis Tangan) dan membandingkannya dengan kunci jawaban Dosen secara verbatim (kata per kata).
                                 </p>
+                            </section>
+
+                            {/* PENGATURAN API KEY (BYOK) */}
+                            <section>
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                                    <span className="text-xl">🔑</span> Pengaturan Kunci API (Disarankan)
+                                </h3>
+                                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-5 border border-yellow-200 dark:border-yellow-700">
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                                        Secara default, aplikasi menggunakan kuota server bersama yang mungkin lambat atau terbatas. 
+                                        Untuk kinerja maksimal (terutama Mode Kelas), disarankan menggunakan <strong>API Key Google Gemini</strong> Anda sendiri. Ini gratis dan mudah didapat.
+                                    </p>
+                                    
+                                    <div className="space-y-2 mb-4">
+                                        <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">Cara Mendapatkan API Key Gratis:</h4>
+                                        <ol className="list-decimal list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1 ml-2">
+                                            <li>Buka <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-600 underline">Google AI Studio</a>.</li>
+                                            <li>Login dengan akun Google Anda.</li>
+                                            <li>Klik tombol <strong>"Create API Key"</strong>.</li>
+                                            <li>Salin kunci yang muncul (dimulai dengan <code>AIza...</code>).</li>
+                                        </ol>
+                                    </div>
+
+                                    {onOpenSettings && (
+                                        <button 
+                                            onClick={onOpenSettings}
+                                            className="px-4 py-2 bg-yellow-100 dark:bg-yellow-800 hover:bg-yellow-200 dark:hover:bg-yellow-700 text-yellow-800 dark:text-yellow-100 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors border border-yellow-300 dark:border-yellow-600"
+                                        >
+                                            <SettingsIcon className="w-4 h-4" />
+                                            Masukkan Key di Pengaturan
+                                        </button>
+                                    )}
+                                </div>
                             </section>
 
                             {/* Lingkungan Sistem & Performa */}
@@ -296,7 +329,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                 <ul className="list-none space-y-1 ml-4 text-gray-300">
                                     <li>Frontend: React 19 + TypeScript</li>
                                     <li>Styling: Tailwind CSS (Dark Mode supported)</li>
-                                    <li>AI SDK: @google/genai (Gemini 3 Pro Preview)</li>
+                                    <li>AI SDK: @google/genai (Gemini 3 Pro / 2 Flash)</li>
                                     <li>Utils: xlsx (Excel Export), jszip (Archive handling), mammoth (Word parsing)</li>
                                 </ul>
                             </div>
@@ -363,7 +396,8 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                                         <p className="mt-1">Service layer yang menangani komunikasi dengan Gemini API.</p>
                                         <ul className="list-disc list-inside ml-4 text-xs mt-1 leading-relaxed">
                                             <li><strong>Stateless Architecture (Critical):</strong> Objek <code>GoogleGenAI</code> diinstansiasi <strong>di dalam</strong> fungsi <code>gradeAnswer</code>, bukan secara global. Ini mencegah kebocoran state/konteks antar request paralel yang bisa menyebabkan AI "berhalusinasi" data mahasiswa A saat menilai mahasiswa B.</li>
-                                            <li><strong>Prompt Engineering:</strong> Menggunakan teknik instruksi deterministik (Temperature 0) dan One-Shot prompting dengan konteks penuh.</li>
+                                            <li><strong>Model Selection (Settings):</strong> Mendukung pemilihan model dinamis via localStorage. Default adalah Gemini 3 Pro, tapi user bisa memilih Gemini 2.0 Flash untuk kecepatan.</li>
+                                            <li><strong>BYOK Support:</strong> Mendeteksi kunci API kustom di localStorage sebelum menggunakan kunci environment default.</li>
                                             <li><strong>Robust Retry:</strong> Mengimplementasikan Exponential Backoff dengan Jitter untuk menangani error Rate Limit (429).</li>
                                         </ul>
                                     </div>

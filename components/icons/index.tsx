@@ -13,3 +13,4 @@ export { DownloadIcon } from './DownloadIcon';
 export { SunIcon } from './SunIcon';
 export { MoonIcon } from './MoonIcon';
 export { QuestionMarkIcon } from './QuestionMarkIcon';
+export { SettingsIcon } from './SettingsIcon';

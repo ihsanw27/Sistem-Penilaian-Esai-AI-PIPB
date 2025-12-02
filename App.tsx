@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import GradingDashboard from './components/GradingDashboard';
-import { SunIcon, MoonIcon, QuestionMarkIcon } from './components/icons';
+import { SunIcon, MoonIcon, QuestionMarkIcon, SettingsIcon } from './components/icons';
 import HelpModal from './components/HelpModal';
+import SettingsModal from './components/SettingsModal';
 
 /**
  * The main application component.
@@ -24,6 +25,8 @@ const App: React.FC = () => {
 
   // State for Help Modal
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
+  // State for Settings Modal
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   // Apply 'dark' class to html element
   useEffect(() => {
@@ -59,12 +62,27 @@ const App: React.FC = () => {
     localStorage.setItem('theme', newIsDark ? 'dark' : 'light');
   };
 
+  const getRecaptchaKey = () => {
+     // Robustly check various environment variable patterns
+     return process.env.RECAPTCHA_SITE_KEY || 
+            process.env.REACT_APP_RECAPTCHA_SITE_KEY || 
+            (import.meta as any).env?.VITE_RECAPTCHA_SITE_KEY ||
+            '';
+  }
+
   return (
     <div className="min-h-screen bg-sky-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 flex flex-col items-center p-4 sm:p-6 lg:p-8 transition-colors duration-200">
     <div className="w-full max-w-5xl mx-auto relative">
         
         {/* Top Right Controls (Dark Mode & Help) */}
         <div className="absolute top-0 right-0 z-50 flex gap-2">
+            <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-2 rounded-full bg-white/50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-all shadow-sm backdrop-blur-sm group"
+                title="Pengaturan (API Key & Model)"
+            >
+                <SettingsIcon className="w-6 h-6 text-gray-600 dark:text-gray-300 group-hover:rotate-90 transition-transform duration-500" />
+            </button>
             <button
                 onClick={() => setIsHelpOpen(true)}
                 className="p-2 rounded-full bg-white/50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-all shadow-sm backdrop-blur-sm group"
@@ -113,7 +131,7 @@ const App: React.FC = () => {
         <p className="mt-2 text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
             Platform asisten penilaian cerdas untuk Politeknik Industri Petrokimia Banten.
             <br/>
-            <span className="text-sm text-gray-500 dark:text-gray-400">Menggunakan teknologi Gemini 3 Pro untuk evaluasi yang objektif, konsisten, dan transparan.</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">Menggunakan teknologi Google Gemini untuk evaluasi yang objektif, konsisten, dan transparan.</span>
         </p>
         </header>
 
@@ -129,7 +147,9 @@ const App: React.FC = () => {
         </footer>
 
         {/* Global Help Modal */}
-        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} onOpenSettings={() => { setIsHelpOpen(false); setIsSettingsOpen(true); }} />
+        {/* Global Settings Modal */}
+        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
     </div>
   );

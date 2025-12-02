@@ -79,7 +79,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
     const handleStudentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         setError(null);
         if (e.target.files) {
-            const files = Array.from(e.target.files);
+            const files = Array.from(e.target.files) as File[];
             
             // SECURITY CHECK: File Size
             const oversizedFiles = files.filter(f => f.size > MAX_FILE_SIZE_BYTES);
@@ -99,7 +99,7 @@ const SingleStudentGrader: React.FC<SingleStudentGraderProps> = ({ onDataDirty }
     const handleLecturerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         setError(null);
         if (e.target.files) {
-            const files = Array.from(e.target.files);
+            const files = Array.from(e.target.files) as File[];
 
              // SECURITY CHECK: File Size
              const oversizedFiles = files.filter(f => f.size > MAX_FILE_SIZE_BYTES);

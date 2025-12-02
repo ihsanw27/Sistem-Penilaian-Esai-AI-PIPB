@@ -16,18 +16,36 @@
  * SECURITY UPDATE:
  * Menambahkan instruksi pertahanan terhadap Prompt Injection.
  * 
+ * BYOK UPDATE:
+ * Mendukung kunci API kustom pengguna dan pemilihan model dari localStorage.
+ * 
  * @dependencies @google/genai
  */
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { GradeResult } from "../types";
 
-// Memastikan kunci API tersedia dari environment variable.
-const API_KEY = process.env.API_KEY;
+// Fungsi untuk mendapatkan API Key yang valid (Prioritas: LocalStorage > Env Var)
+const getApiKey = (): string => {
+    // 1. Cek LocalStorage (User Settings)
+    const customKey = typeof window !== 'undefined' ? localStorage.getItem('USER_GEMINI_API_KEY') : null;
+    if (customKey && customKey.trim().length > 0) {
+        return customKey.trim();
+    }
+    
+    // 2. Fallback ke Environment Variable (Server Default)
+    const envKey = process.env.API_KEY;
+    if (envKey) return envKey;
 
-if (!API_KEY) {
-    throw new Error("API_KEY environment variable not set");
-}
+    throw new Error("API Key tidak ditemukan. Harap masukkan kunci di menu Pengaturan atau hubungi admin.");
+};
+
+// Fungsi untuk mendapatkan Model yang dipilih (Prioritas: LocalStorage > Default)
+const getModel = (): string => {
+    const customModel = typeof window !== 'undefined' ? localStorage.getItem('USER_GEMINI_MODEL') : null;
+    // UPDATED DEFAULT: 'gemini-2.0-flash' for better speed and rate limits on free tier.
+    return customModel || 'gemini-2.0-flash';
+};
 
 // Definisi tipe untuk bagian konten yang dapat dikirim ke Gemini API.
 // Bisa berupa teks sederhana atau data biner inline (gambar/PDF) yang dikodekan dalam Base64.
@@ -40,11 +58,9 @@ type ContentPart = { text: string; } | { inlineData: { data: string; mimeType: s
  */
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// INITIAL BACKOFF: 1000ms (1 Detik).
-// UPDATED (Optimized for Speed): Menurunkan dari 2000ms ke 1000ms.
-// Ini membuat retry pertama jauh lebih cepat, mengurangi persepsi "lambat" pada penilaian individu.
-// Untuk Mode Kelas, keamanan tetap terjaga lewat Frontend Staggering.
-const INITIAL_BACKOFF_MS = 1000;
+// INITIAL BACKOFF: 2000ms.
+// Dikembalikan ke 2000ms untuk keseimbangan responsivitas dan stabilitas.
+const INITIAL_BACKOFF_MS = 2000;
 
 /**
  * Menilai jawaban siswa terhadap kunci jawaban dosen menggunakan Gemini API.
@@ -65,12 +81,22 @@ export const gradeAnswer = async (
     studentAnswerParts: ContentPart[],
     lecturerAnswer: { parts?: ContentPart[]; text?: string }
 ): Promise<GradeResult | null> => {
-    // STATELESS INSTANTIATION: Mencegah data bleeding antar request
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    
+    let apiKey: string;
+    try {
+        apiKey = getApiKey();
+    } catch (e: any) {
+        console.error("API Key Error:", e.message);
+        // Kita tidak bisa throw error ke UI di sini tanpa refactor besar, jadi return null.
+        // Idealnya UI menangani ini sebelum panggil gradeAnswer.
+        return null; 
+    }
 
-    // UPGRADE KUALITAS: Menggunakan 'gemini-3-pro-preview' karena menawarkan kemampuan penalaran superior
-    // untuk tugas OCR kompleks dan pemetaan konteks dibandingkan model Flash.
-    const gradingModel = 'gemini-3-pro-preview';
+    // STATELESS INSTANTIATION: Mencegah data bleeding antar request
+    const ai = new GoogleGenAI({ apiKey: apiKey });
+
+    // MODEL SELECTION: Menggunakan model dari preferensi user
+    const gradingModel = getModel();
 
     // REKAYASA PROMPT (PROMPT ENGINEERING):
     const gradingInstruction = `

@@ -13,9 +13,9 @@ import AILoader from './AILoader';
 const SAFETY_TIMEOUT_MS = 15 * 60 * 1000; 
 
 // OPTIMIZED CONCURRENCY LIMIT
-// Karena arsitektur service sekarang Stateless (Isolated), kita bisa meningkatkan konkurensi.
-// Limit 8 adalah "Sweet Spot" untuk akun Free/Pay-as-you-go standar pada model Gemini 3 Pro.
-const CONCURRENCY_LIMIT = 8;
+// Updated to 5: This is the safest "sweet spot" for Gemini 2.0 Flash on Free Tier/Auto-scale.
+// Limit 8 was too aggressive for Free Tier and caused 429s.
+const CONCURRENCY_LIMIT = 5;
 
 // MAX FILE SIZE: 10MB
 const MAX_FILE_SIZE_MB = 10;
